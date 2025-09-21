@@ -1,0 +1,1 @@
+<template><h1>Teacher Dashboard</h1><p>Course creation and student progress tracking will be here.</p></template>
