@@ -5,8 +5,6 @@ from models import User, Teacher, UserRole
 from sqlalchemy.exc import IntegrityError
 
 def create_admin():
-    print("Creating Initial Administrator Account")
-
     with app.app_context():
         try:
             username = input("Enter admin username: ")
