@@ -32,11 +32,11 @@ const handleLogout = () => {
         <!-- Show these links only if user IS logged in -->
         <template v-if="authStore.isAuthenticated">
           <RouterLink to="/dashboard">Dashboard</RouterLink>
-          <a @click="handleLogout" href="#" class="logout-link">Logout</a>
+          
           <RouterLink v-if="authStore.isTeacher || authStore.isAdmin" to="/manage-courses">
           Manage Courses
           </RouterLink>
-          <a @click="handleLogout" href="#">Logout</a>
+          <a @click="handleLogout" href="#" class="logout-link">Logout</a>
         </template>
       </nav>
     </header>
