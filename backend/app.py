@@ -15,7 +15,6 @@ if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 else:
     print("Warning: .env file not found.")
-
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
@@ -50,6 +49,23 @@ def admin_required():
             # error handling
             if 'administrator' not in roles:
                 return jsonify({"error": "Admins only!"}), 403
+            return fn(*args, **kwargs)
+        return decorator
+    return wrapper
+
+# This decorator is more flexible for routes that teachers OR admins can access.
+def roles_required(*roles):
+    """Decorator to ensure user has at least one of the specified roles."""
+    def wrapper(fn):
+        @wraps(fn)
+        @jwt_required()
+        def decorator(*args, **kwargs):
+            current_user_id = get_jwt_identity()
+            user = User.query.get(current_user_id)
+            user_roles = {r.role for r in user.roles}
+            
+            if not user_roles.intersection(roles):
+                return jsonify({"error": "Access forbidden: insufficient permissions"}), 403
             return fn(*args, **kwargs)
         return decorator
     return wrapper
