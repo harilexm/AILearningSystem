@@ -59,6 +59,16 @@ const router = createRouter({
         requiresAuth: true,
         allowedRoles: ['administrator'] // Strictly Admins only
       }
+    },
+    // ... (inside the routes array)
+    {
+      path: '/manage-courses',
+      name: 'manage-courses',
+      component: () => import('../views/CourseManagementView.vue'),
+      meta: { 
+        requiresAuth: true,
+        allowedRoles: ['teacher', 'administrator'] // Protect this route
+      }
     }
   ]
 })
