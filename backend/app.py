@@ -205,5 +205,20 @@ def create_course():
     db.session.commit()
     return jsonify({"message": "Course created successfully", "course_id": str(new_course.id)}), 201
 
+@app.route('/api/courses', methods=['GET'])
+@jwt_required()
+def get_courses():
+    """Returns a list of all available courses. Accessible by any logged-in user."""
+    courses = Course.query.order_by(Course.title).all()
+    # Include teacher's name for display purposes
+    output = []
+    for c in courses:
+        teacher_name = "N/A"
+        if c.created_by_teacher_id and c.teacher:
+             teacher_name = f"{c.teacher.first_name} {c.teacher.last_name}"
+        output.append({"id": str(c.id), "title": c.title, "description": c.description, "author": teacher_name})
+        
+    return jsonify(output)
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
