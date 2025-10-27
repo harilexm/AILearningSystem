@@ -184,5 +184,26 @@ def delete_user(user_id):
     db.session.commit()
     return jsonify({"message": f"User '{user_to_delete.username}' has been deleted."}), 200
 
+@app.route('/api/courses', methods=['POST'])
+@roles_required('teacher', 'administrator')
+def create_course():
+    """Creates a new course. Accessible by teachers and admins."""
+    data = request.get_json()
+    if not data or not data.get('title'):
+        return jsonify({"error": "Title is required"}), 400
+    
+    current_user_id = get_jwt_identity()
+    # Find the teacher profile associated with the logged-in user
+    teacher = Teacher.query.filter_by(user_id=current_user_id).first()
+    
+    new_course = Course(
+        title=data['title'],
+        description=data.get('description', ''),
+        created_by_teacher_id=teacher.id if teacher else None
+    )
+    db.session.add(new_course)
+    db.session.commit()
+    return jsonify({"message": "Course created successfully", "course_id": str(new_course.id)}), 201
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
