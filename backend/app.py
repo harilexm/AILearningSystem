@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from models import db, User, UserRole, Student, Teacher, Course, Module, LearningContent
 
 # Application Setup
-dotenv_path = os.path.join(os.path.dirname(__file__), '.env') 
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path)
 else:
