@@ -20,21 +20,21 @@ app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
 
 #  Database Configuration
-db_url = os.environ.get('DATABASE_URL') 
+db_url = os.environ.get('DATABASE_URL')
 if not db_url:
     raise RuntimeError("FATAL ERROR: DATABASE_URL is not set.")
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # JWT Configuration
-jwt_secret = os.environ.get('JWT_SECRET_KEY') 
+jwt_secret = os.environ.get('JWT_SECRET_KEY')
 if not jwt_secret:
     raise RuntimeError("FATAL ERROR: JWT_SECRET_KEY is not set.")
 app.config["JWT_SECRET_KEY"] = jwt_secret
 jwt = JWTManager(app)
 
 # Initialize Extensions
-db.init_app(app) 
+db.init_app(app)
 bcrypt = Bcrypt(app)
 
 # CUSTOM DECORATOR: Admin-Only Routes
