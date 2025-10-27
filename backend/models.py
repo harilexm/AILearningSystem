@@ -55,3 +55,46 @@ class Teacher(db.Model):
     def __repr__(self):
         return f'<Teacher {self.first_name} {self.last_name}>'
 # new model down here as course, ai system etc
+
+class Course(db.Model):
+    __tablename__ = 'courses'
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    created_by_teacher_id = db.Column(UUID(as_uuid=True), db.ForeignKey('teachers.id'), nullable=True)
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+
+    # Relationships
+    modules = db.relationship('Module', backref='course', lazy=True, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f'<Course {self.title}>'
+
+class Module(db.Model):
+    __tablename__ = 'modules'
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    course_id = db.Column(UUID(as_uuid=True), db.ForeignKey('courses.id'), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    module_order = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+
+    # Relationships
+    learning_contents = db.relationship('LearningContent', backref='module', lazy=True, cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f'<Module {self.title}>'
+
+class LearningContent(db.Model):
+    __tablename__ = 'learning_content'
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    module_id = db.Column(UUID(as_uuid=True), db.ForeignKey('modules.id'), nullable=False)
+    type = db.Column(ENUM('video', 'article', 'quiz', 'exercise', 'assignment', name='content_type'), nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    content_url = db.Column(db.Text) # For videos, external links
+    content_body = db.Column(db.Text) # For articles, text
+    content_order = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+
+    def __repr__(self):
+        return f'<LearningContent {self.title}>'
