@@ -303,5 +303,42 @@ def create_learning_content(module_id):
     db.session.commit()
     return jsonify({"message": "Learning content added successfully", "content_id": str(new_content.id)}), 201
 
+# backend/app.py
+# --- ADD THIS NEW ROUTE ---
+
+@app.route('/api/progress/<uuid:content_id>/complete', methods=['POST'])
+@jwt_required()
+def mark_content_complete(content_id):
+    """Marks a piece of learning content as complete for the logged-in student."""
+    current_user_id = get_jwt_identity()
+    student = Student.query.filter_by(user_id=current_user_id).first()
+    
+    if not student:
+        return jsonify({"error": "Student profile not found for this user."}), 404
+        
+    # Find if a progress record already exists
+    progress_record = StudentContentProgress.query.filter_by(
+        student_id=student.id,
+        content_id=content_id
+    ).first()
+    
+    if progress_record:
+        # Update existing record
+        progress_record.status = 'completed'
+        progress_record.completed_at = datetime.datetime.utcnow()
+        progress_record.last_accessed_at = datetime.datetime.utcnow()
+    else:
+        # Create a new record
+        progress_record = StudentContentProgress(
+            student_id=student.id,
+            content_id=content_id,
+            status='completed',
+            completed_at=datetime.datetime.utcnow()
+        )
+        db.session.add(progress_record)
+        
+    db.session.commit()
+    return jsonify({"message": "Progress updated successfully", "status": "completed"})
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
