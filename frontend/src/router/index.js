@@ -69,6 +69,17 @@ const router = createRouter({
         requiresAuth: true,
         allowedRoles: ['teacher', 'administrator'] // Protect this route
       }
+    },
+        // ... (inside the routes array)
+    {
+      path: '/courses/:courseId', // e.g., /courses/some-uuid-string
+      name: 'course-details',
+      component: () => import('../views/CourseDetailView.vue'),
+      meta: { 
+        requiresAuth: true,
+        // Accessible by anyone logged in, as they might want to browse
+        allowedRoles: ['student', 'teacher', 'administrator']
+      }
     }
   ]
 })
