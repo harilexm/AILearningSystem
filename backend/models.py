@@ -96,5 +96,24 @@ class LearningContent(db.Model):
     content_order = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
 
+# backend/models.py
+# ... (all existing imports and models are unchanged) ...
+
+class StudentContentProgress(db.Model):
+    __tablename__ = 'student_content_progress'
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id = db.Column(UUID(as_uuid=True), db.ForeignKey('students.id'), nullable=False)
+    content_id = db.Column(UUID(as_uuid=True), db.ForeignKey('learning_content.id'), nullable=False)
+    status = db.Column(ENUM('not_started', 'in_progress', 'completed', 'skipped', name='progress_status'), nullable=False, default='not_started')
+    started_at = db.Column(db.DateTime(timezone=True))
+    completed_at = db.Column(db.DateTime(timezone=True))
+    last_accessed_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+
+    # Relationships for easy access
+    student = db.relationship('Student', backref='progress_records')
+    learning_content = db.relationship('LearningContent', backref='progress_records')
+
+    def __repr__(self):
+        return f'<Progress student={self.student_id} content={self.content_id} status={self.status}>'
     def __repr__(self):
         return f'<LearningContent {self.title}>'
