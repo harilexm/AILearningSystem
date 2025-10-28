@@ -217,8 +217,91 @@ def get_courses():
         if c.created_by_teacher_id and c.teacher:
              teacher_name = f"{c.teacher.first_name} {c.teacher.last_name}"
         output.append({"id": str(c.id), "title": c.title, "description": c.description, "author": teacher_name})
-        
     return jsonify(output)
+
+# ENHANCED CURRICULUM MANAGEMENT API
+@app.route('/api/courses/<uuid:course_id>', methods=['GET'])
+@jwt_required()
+def get_course_details(course_id):
+    """Returns a single course with all its nested modules and learning content."""
+    course = Course.query.get_or_404(course_id)
+    
+    course_data = {
+        "id": str(course.id),
+        "title": course.title,
+        "description": course.description,
+        "modules": []
+    }
+    
+    # Sort modules by their defined order
+    sorted_modules = sorted(course.modules, key=lambda m: m.module_order)
+    
+    for module in sorted_modules:
+        module_data = {
+            "id": str(module.id),
+            "title": module.title,
+            "description": module.description,
+            "order": module.module_order,
+            "learning_contents": []
+        }
+        
+        # Sort learning content by its defined order
+        sorted_content = sorted(module.learning_contents, key=lambda c: c.content_order)
+        for content in sorted_content:
+            content_data = {
+                "id": str(content.id),
+                "title": content.title,
+                "type": content.type,
+                "url": content.content_url,
+                "body": content.content_body,
+                "order": content.content_order
+            }
+            module_data["learning_contents"].append(content_data)
+        
+        course_data["modules"].append(module_data)
+        
+    return jsonify(course_data)
+
+@app.route('/api/courses/<uuid:course_id>/modules', methods=['POST'])
+@roles_required('teacher', 'administrator')
+def create_module(course_id):
+    """Creates a new module and adds it to a course."""
+    course = Course.query.get_or_404(course_id)
+    data = request.get_json()
+    if not data or not data.get('title') or 'order' not in data:
+        return jsonify({"error": "Title and order are required"}), 400
+        
+    new_module = Module(
+        course_id=course.id,
+        title=data['title'],
+        description=data.get('description', ''),
+        module_order=data['order']
+    )
+    db.session.add(new_module)
+    db.session.commit()
+    return jsonify({"message": "Module added successfully", "module_id": str(new_module.id)}), 201
+
+@app.route('/api/modules/<uuid:module_id>/content', methods=['POST'])
+@roles_required('teacher', 'administrator')
+def create_learning_content(module_id):
+    """Creates new learning content and adds it to a module."""
+    module = Module.query.get_or_404(module_id)
+    data = request.get_json()
+    required = ['title', 'type', 'order']
+    if not all(field in data for field in required):
+        return jsonify({"error": "Title, type, and order are required"}), 400
+
+    new_content = LearningContent(
+        module_id=module.id,
+        title=data['title'],
+        type=data['type'],
+        content_order=data['order'],
+        content_url=data.get('url'),
+        content_body=data.get('body')
+    )
+    db.session.add(new_content)
+    db.session.commit()
+    return jsonify({"message": "Learning content added successfully", "content_id": str(new_content.id)}), 201
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
