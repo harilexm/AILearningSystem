@@ -66,7 +66,7 @@ class Course(db.Model):
 
     # Relationships
     modules = db.relationship('Module', backref='course', lazy=True, cascade="all, delete-orphan")
-
+    teacher = db.relationship('Teacher', backref='courses')
     def __repr__(self):
         return f'<Course {self.title}>'
 
