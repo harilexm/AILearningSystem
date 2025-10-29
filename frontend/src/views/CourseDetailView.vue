@@ -15,6 +15,16 @@
             <div class="content-info">
               <span class="content-title">{{ content.title }}</span>
               <a v-if="content.url" :href="content.url" target="_blank" class="content-link">Go to Content &rarr;</a>
+              <!-- DYNAMIC LINKING LOGIC -->
+              <a v-if="content.type === 'video' && content.url" :href="content.url" target="_blank" class="content-link">
+                Watch Video &rarr;
+              </a>
+              <RouterLink v-else-if="content.type === 'quiz'" :to="{ name: 'take-quiz', params: { contentId: content.id } }" class="content-link">
+                Start Quiz &rarr;
+              </RouterLink>
+              <span v-else-if="content.type === 'article'" class="content-link-placeholder">
+                (Article content will show here)
+              </span>
             </div>
             <!-- INTERACTION BUTTON -->
             <div class="content-action">
