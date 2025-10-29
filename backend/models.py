@@ -95,6 +95,8 @@ class LearningContent(db.Model):
     content_body = db.Column(db.Text) # For articles, text
     content_order = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+    def __repr__(self):
+        return f'<LearningContent {self.title}>'
 
 # backend/models.py
 # ... (all existing imports and models are unchanged) ...
@@ -115,5 +117,4 @@ class StudentContentProgress(db.Model):
 
     def __repr__(self):
         return f'<Progress student={self.student_id} content={self.content_id} status={self.status}>'
-    def __repr__(self):
-        return f'<LearningContent {self.title}>'
+    
