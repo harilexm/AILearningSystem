@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 import uuid
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 import datetime
+from sqlalchemy.dialects.postgresql import JSONB
 
 db = SQLAlchemy()
 
