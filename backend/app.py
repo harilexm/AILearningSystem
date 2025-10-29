@@ -394,5 +394,80 @@ def get_course_progress(course_id):
     
     return jsonify(output)
 
+# --- QUIZ AND ASSESSMENT API ---
+
+@app.route('/api/quizzes/<uuid:content_id>', methods=['GET'])
+@jwt_required()
+def get_quiz_questions(content_id):
+    """
+    Fetches a quiz for a student, returning only questions and options,
+    NEVER the correct answers.
+    """
+    quiz_content = LearningContent.query.get_or_404(content_id)
+    if quiz_content.type != 'quiz' or not quiz_content.metadata or 'questions' not in quiz_content.metadata:
+        return jsonify({"error": "This content is not a valid quiz."}), 404
+
+    # Sanitize the questions, removing the 'answer' key before sending to the client
+    questions_for_student = []
+    for i, q in enumerate(quiz_content.metadata['questions']):
+        questions_for_student.append({
+            "id": i, # Assign a simple ID for the frontend to track
+            "question": q.get("question"),
+            "options": q.get("options")
+        })
+    
+    return jsonify({
+        "quiz_title": quiz_content.title,
+        "questions": questions_for_student
+    })
+
+@app.route('/api/quizzes/<uuid:content_id>/submit', methods=['POST'])
+@jwt_required()
+def submit_quiz(content_id):
+    """
+    Receives student's answers, grades them, and stores the attempt.
+    """
+    quiz_content = LearningContent.query.get_or_404(content_id)
+    student_answers = request.get_json().get('answers') # e.g., [{"questionId": 0, "answer": "Paris"}]
+    
+    if not student_answers or not isinstance(student_answers, list):
+        return jsonify({"error": "Invalid submission format"}), 400
+
+    current_user_id = get_jwt_identity()
+    student = Student.query.filter_by(user_id=current_user_id).first()
+    if not student: return jsonify({"error": "Student profile not found"}), 404
+    
+    correct_answers = quiz_content.metadata.get('questions', [])
+    score = 0
+    max_score = len(correct_answers)
+    
+    # Grade the submission
+    for student_answer in student_answers:
+        question_id = student_answer.get('questionId')
+        submitted_answer = student_answer.get('answer')
+        
+        if 0 <= question_id < len(correct_answers):
+            if correct_answers[question_id].get('answer') == submitted_answer:
+                score += 1
+
+    # Store the attempt
+    new_attempt = AssessmentAttempt(
+        content_id=content_id,
+        student_id=student.id,
+        score=score,
+        max_score=max_score,
+        answers={'submitted_answers': student_answers} # Store what the student submitted
+    )
+    db.session.add(new_attempt)
+    db.session.commit()
+    
+    # Return the results to the student
+    return jsonify({
+        "message": "Quiz submitted successfully!",
+        "score": score,
+        "max_score": max_score,
+        "correct_answers": [q.get('answer') for q in correct_answers] # Send answers for review
+    })
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
