@@ -297,7 +297,8 @@ def create_learning_content(module_id):
         type=data['type'],
         content_order=data['order'],
         content_url=data.get('url'),
-        content_body=data.get('body')
+        content_body=data.get('body'),
+        metadata=data.get('metadata')
     )
     db.session.add(new_content)
     db.session.commit()
