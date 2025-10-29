@@ -187,6 +187,12 @@ onMounted(fetchCourses);
 .content-item-empty { color: #888; font-style: italic; }
 .add-content-form { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; display: flex; gap: 0.5rem; align-items: center;}
 .btn-small { padding: 0.5rem 1rem; }
+.btn-secondary {
+  display: inline-block;
+  background-color: #6c757d;
+  margin-bottom: 1.5rem;
+  text-decoration: none;
+}
 /* General Styles from before */
 .course-mgmt-container { max-width: 1200px; margin: 2rem auto; padding: 1rem; }
 .card { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
