@@ -10,7 +10,10 @@
       <div v-for="course in courses" :key="course.id" class="course-card">
         <h3>{{ course.title }}</h3>
         <p class="course-author">Created by: {{ course.author }}</p>
-        <p class="course-desc">{{ course.description }}</p>
+        
+        <!-- THIS IS THE FIX: Truncate the description for a cleaner look -->
+        <p class="course-desc">{{ truncate(course.description, 100) }}</p>
+
         <RouterLink :to="{ name: 'course-details', params: { courseId: course.id } }" class="btn">
           View Course
         </RouterLink>
@@ -46,6 +49,13 @@ const fetchCourses = async () => {
   }
 };
 
+// --- NEW HELPER FUNCTION FOR THE UI FIX ---
+const truncate = (text, length) => {
+  if (!text) return '';
+  if (text.length <= length) return text;
+  return text.substring(0, length) + '...';
+};
+
 onMounted(fetchCourses);
 </script>
 
@@ -73,20 +83,21 @@ onMounted(fetchCourses);
 .course-card h3 { margin-top: 0; }
 .course-author { font-style: italic; color: #6c757d; font-size: 0.9rem; }
 .course-desc {
-  flex-grow: 1; /* Pushes the button to the bottom */
+  flex-grow: 1; /* This is key: it pushes the button to the bottom */
   color: #495057;
   line-height: 1.5;
+  margin-bottom: 1rem; /* Add some space above the button */
 }
 .btn {
   display: block;
   text-align: center;
-  margin-top: 1rem;
   background-color: #28a745;
   color: white;
   padding: 0.75rem;
   border-radius: 5px;
   text-decoration: none;
   font-weight: bold;
+  margin-top: auto; /* Pushes button to the bottom of the card */
 }
 .error-message { color: #dc3545; }
 .loading { color: #6c757d; }

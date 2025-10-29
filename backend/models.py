@@ -94,7 +94,7 @@ class LearningContent(db.Model):
     title = db.Column(db.String(255), nullable=False)
     content_body = db.Column(db.Text)
     content_order = db.Column(db.Integer, nullable=False)
-    metadata = db.Column(JSONB)
+    content_metadata = db.Column(JSONB)
     content_url = db.Column(db.Text) # For videos, external links
     content_body = db.Column(db.Text) # For articles, text
     content_order = db.Column(db.Integer, nullable=False)
