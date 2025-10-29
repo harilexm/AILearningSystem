@@ -80,7 +80,17 @@ const router = createRouter({
         // Accessible by anyone logged in, as they might want to browse
         allowedRoles: ['student', 'teacher', 'administrator']
       }
-    }
+    },
+    // ... (inside the routes array, probably after 'manage-courses')
+    {
+      path: '/courses/:courseId/progress',
+      name: 'course-progress',
+      component: () => import('../views/CourseProgressView.vue'),
+      meta: { 
+        requiresAuth: true,
+        allowedRoles: ['teacher', 'administrator']
+      }
+    },
   ]
 })
 
