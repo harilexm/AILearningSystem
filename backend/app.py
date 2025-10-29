@@ -340,5 +340,58 @@ def mark_content_complete(content_id):
     db.session.commit()
     return jsonify({"message": "Progress updated successfully", "status": "completed"})
 
+# --- NEW TEACHER ANALYTICS API ---
+
+@app.route('/api/courses/<uuid:course_id>/progress', methods=['GET'])
+@roles_required('teacher', 'administrator')
+def get_course_progress(course_id):
+    """
+    For a given course, calculates the progress of every student who has started it.
+    Accessible by teachers and admins.
+    """
+    course = Course.query.get_or_404(course_id)
+    
+    # 1. Get all content IDs for this course to define the scope
+    course_content_ids = db.session.query(LearningContent.id).join(Module).filter(Module.course_id == course.id).all()
+    # Flatten the list of tuples into a simple list of IDs
+    content_ids = [c_id[0] for c_id in course_content_ids]
+    
+    if not content_ids:
+        return jsonify([]) # Return empty list if course has no content
+
+    total_items = len(content_ids)
+
+    # 2. Find all progress records for this course's content
+    progress_records = StudentContentProgress.query.filter(
+        StudentContentProgress.content_id.in_(content_ids),
+        StudentContentProgress.status == 'completed'
+    ).all()
+
+    # 3. Aggregate progress by student
+    student_progress = {}
+    for record in progress_records:
+        student_id = record.student_id
+        if student_id not in student_progress:
+            # Initialize student if not seen before
+            student_profile = Student.query.get(student_id)
+            student_progress[student_id] = {
+                "student_id": str(student_id),
+                "student_name": f"{student_profile.first_name} {student_profile.last_name}",
+                "completed_count": 0
+            }
+        student_progress[student_id]["completed_count"] += 1
+
+    # 4. Format the final output with percentages
+    output = []
+    for student_id, data in student_progress.items():
+        data['total_items'] = total_items
+        data['percentage'] = round((data['completed_count'] / total_items) * 100, 2)
+        output.append(data)
+        
+    # Sort by student name for a consistent view
+    output.sort(key=lambda x: x['student_name'])
+    
+    return jsonify(output)
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
