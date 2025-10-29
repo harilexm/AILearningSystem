@@ -40,6 +40,13 @@
         
         <div v-else>
           <h2>Building: {{ selectedCourse.title }}</h2>
+          <!-- ADD THIS BUTTON -->
+          <RouterLink 
+            :to="{ name: 'course-progress', params: { courseId: selectedCourse.id } }" 
+            class="btn btn-secondary"
+          >
+            View Student Progress
+          </RouterLink>
           
           <!-- Modules Section -->
           <div v-for="module in selectedCourse.modules" :key="module.id" class="card module-card">
