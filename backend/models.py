@@ -92,10 +92,14 @@ class LearningContent(db.Model):
     module_id = db.Column(UUID(as_uuid=True), db.ForeignKey('modules.id'), nullable=False)
     type = db.Column(ENUM('video', 'article', 'quiz', 'exercise', 'assignment', name='content_type'), nullable=False)
     title = db.Column(db.String(255), nullable=False)
+    content_body = db.Column(db.Text)
+    content_order = db.Column(db.Integer, nullable=False)
+    metadata = db.Column(JSONB)
     content_url = db.Column(db.Text) # For videos, external links
     content_body = db.Column(db.Text) # For articles, text
     content_order = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
+    
 
 # backend/models.py
 # ... (all existing imports and models are unchanged) ...
