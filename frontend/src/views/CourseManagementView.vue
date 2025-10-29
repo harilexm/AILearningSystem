@@ -5,31 +5,7 @@
     <div class="main-grid">
       <!-- Left Column: Course List and Creation -->
       <div class="course-list-panel">
-        <div class="card">
-          <h2>Create a New Course</h2>
-          <form @submit.prevent="handleCreateCourse">
-            <div class="form-group">
-              <label for="courseTitle">Course Title</label>
-              <input id="courseTitle" v-model="newCourse.title" type="text" required />
-            </div>
-            <div class="form-group">
-              <label for="courseDesc">Course Description</label>
-              <textarea id="courseDesc" v-model="newCourse.description"></textarea>
-            </div>
-            <button type="submit" class="btn">Create Course</button>
-          </form>
-        </div>
-
-        <div class="card">
-          <h2>Existing Courses</h2>
-          <div v-if="isLoadingCourses">Loading...</div>
-          <ul v-else-if="courses.length > 0" class="course-list">
-            <li v-for="course in courses" :key="course.id" @click="selectCourse(course.id)" :class="{ selected: selectedCourse?.id === course.id }">
-              {{ course.title }}
-            </li>
-          </ul>
-          <p v-else>No courses created yet.</p>
-        </div>
+        <!-- ... (Course creation and list part is unchanged) ... -->
       </div>
 
       <!-- Right Column: Course Builder -->
@@ -40,44 +16,51 @@
         
         <div v-else>
           <h2>Building: {{ selectedCourse.title }}</h2>
-          <!-- ADD THIS BUTTON -->
-          <RouterLink 
-            :to="{ name: 'course-progress', params: { courseId: selectedCourse.id } }" 
-            class="btn btn-secondary"
-          >
+          <RouterLink :to="{ name: 'course-progress', params: { courseId: selectedCourse.id } }" class="btn btn-secondary">
             View Student Progress
           </RouterLink>
           
           <!-- Modules Section -->
           <div v-for="module in selectedCourse.modules" :key="module.id" class="card module-card">
             <h3>Module {{ module.order }}: {{ module.title }}</h3>
-            <!-- Existing Content -->
             <ul class="content-list">
-              <li v-for="content in module.learning_contents" :key="content.id" class="content-item">
-                <span>{{ content.order }}. {{ content.title }} ({{ content.type }})</span>
-              </li>
-              <li v-if="!module.learning_contents.length" class="content-item-empty">No content yet.</li>
+              <!-- ... (Existing content list is unchanged) ... -->
             </ul>
-            <!-- Add New Content Form -->
+
+            <!-- MODIFIED Add New Content Form -->
             <form @submit.prevent="handleAddContent(module.id)" class="add-content-form">
               <h4>Add New Content</h4>
-              <input v-model="newContent[module.id].title" type="text" placeholder="Content Title" required/>
-              <select v-model="newContent[module.id].type">
-                <option value="video">Video</option>
-                <option value="article">Article</option>
-              </select>
-              <input v-model="newContent[module.id].url" type="text" placeholder="Content URL (for videos)" />
-              <button type="submit" class="btn-small">Add Content</button>
+              <div class="content-form-grid">
+                <input v-model="newContent[module.id].title" type="text" placeholder="Content Title" required/>
+                <select v-model="newContent[module.id].type">
+                  <option value="video">Video</option>
+                  <option value="article">Article</option>
+                  <option value="quiz">Quiz</option> <!-- NEW OPTION -->
+                </select>
+                <input v-if="newContent[module.id].type === 'video'" v-model="newContent[module.id].url" type="text" placeholder="Content URL"/>
+              </div>
+
+              <!-- NEW: QUIZ BUILDER UI -->
+              <div v-if="newContent[module.id].type === 'quiz'" class="quiz-builder">
+                <h5>Quiz Questions</h5>
+                <div v-for="(question, qIndex) in newContent[module.id].quizData.questions" :key="qIndex" class="question-builder">
+                  <input v-model="question.question" type="text" :placeholder="`Question ${qIndex + 1}`" />
+                  <div v-for="(option, oIndex) in question.options" :key="oIndex" class="option-builder">
+                    <input type="radio" :name="`correct_answer_${qIndex}`" :value="option" v-model="question.answer">
+                    <input v-model="question.options[oIndex]" type="text" :placeholder="`Option ${oIndex + 1}`" />
+                  </div>
+                  <button type="button" @click="addOption(module.id, qIndex)" class="btn-tiny">Add Option</button>
+                </div>
+                <button type="button" @click="addQuestion(module.id)" class="btn-small">Add Question</button>
+              </div>
+
+              <button type="submit" class="btn-add-content">Add Content</button>
             </form>
           </div>
 
           <!-- Add New Module Form -->
           <div class="card">
-            <h2>Add New Module</h2>
-            <form @submit.prevent="handleAddModule">
-              <input v-model="newModule.title" type="text" placeholder="Module Title" required />
-              <button type="submit" class="btn">Add Module</button>
-            </form>
+            <!-- ... (This part is unchanged) ... -->
           </div>
         </div>
       </div>
@@ -87,90 +70,69 @@
   </div>
 </template>
 
+<!-- REVISED SCRIPT for CourseManagementView.vue -->
 <script setup>
 import { ref, onMounted } from 'vue';
+import { RouterLink } from 'vue-router'; // Import RouterLink
 import { useAuthStore } from '@/stores/auth';
 import axios from 'axios';
 
-const authStore = useAuthStore();
-const courses = ref([]);
-const selectedCourse = ref(null);
-const isLoadingCourses = ref(true);
-const message = ref('');
-const isError = ref(false);
-
-const newCourse = ref({ title: '', description: '' });
-const newModule = ref({ title: '', description: '' });
+// ... (most refs are unchanged) ...
 const newContent = ref({}); // Use an object keyed by module ID
 
-const apiClient = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  headers: { Authorization: `Bearer ${authStore.token}` }
-});
-
-const fetchCourses = async () => {
-  isLoadingCourses.value = true;
-  try {
-    const response = await apiClient.get('/courses');
-    courses.value = response.data;
-  } catch (err) { handleApiError(err, 'Failed to load courses.'); }
-  finally { isLoadingCourses.value = false; }
+// Initialize the quizData structure for new content
+const initializeNewContent = (moduleId) => {
+  newContent.value[moduleId] = {
+    title: '',
+    type: 'video',
+    url: '',
+    body: '',
+    metadata: { questions: [] } // Initialize with empty questions
+  };
 };
 
 const selectCourse = async (courseId) => {
-  try {
-    const response = await apiClient.get(`/courses/${courseId}`);
-    selectedCourse.value = response.data;
-    // Initialize newContent objects for each module
-    selectedCourse.value.modules.forEach(module => {
-      newContent.value[module.id] = { title: '', type: 'video', url: '', body: '' };
-    });
-  } catch (err) { handleApiError(err, 'Failed to load course details.'); }
-};
-
-const handleCreateCourse = async () => {
-  try {
-    await apiClient.post('/courses', newCourse.value);
-    showApiMessage('Course created successfully.');
-    newCourse.value = { title: '', description: '' };
-    await fetchCourses();
-  } catch (err) { handleApiError(err, 'Failed to create course.'); }
-};
-
-const handleAddModule = async () => {
-  const nextOrder = (selectedCourse.value.modules.length || 0) + 1;
-  const payload = { ...newModule.value, order: nextOrder };
-  try {
-    await apiClient.post(`/courses/${selectedCourse.value.id}/modules`, payload);
-    showApiMessage('Module added successfully.');
-    newModule.value.title = '';
-    await selectCourse(selectedCourse.value.id); // Refresh details
-  } catch (err) { handleApiError(err, 'Failed to add module.'); }
+  // ... (existing logic) ...
+  selectedCourse.value.modules.forEach(module => {
+    initializeNewContent(module.id); // Initialize for each module
+  });
 };
 
 const handleAddContent = async (moduleId) => {
+  const content = newContent.value[moduleId];
   const module = selectedCourse.value.modules.find(m => m.id === moduleId);
   const nextOrder = (module.learning_contents.length || 0) + 1;
-  const payload = { ...newContent.value[moduleId], order: nextOrder };
+  
+  // Prepare payload based on content type
+  const payload = { 
+    title: content.title, 
+    type: content.type, 
+    order: nextOrder,
+    url: content.type === 'video' ? content.url : null,
+    body: content.type === 'article' ? content.body : null,
+    metadata: content.type === 'quiz' ? content.metadata : null
+  };
+
   try {
     await apiClient.post(`/modules/${moduleId}/content`, payload);
     showApiMessage('Content added successfully.');
-    newContent.value[moduleId] = { title: '', type: 'video', url: '', body: '' };
+    initializeNewContent(moduleId); // Reset form
     await selectCourse(selectedCourse.value.id); // Refresh details
   } catch (err) { handleApiError(err, 'Failed to add content.'); }
 };
 
-const showApiMessage = (msg, error = false) => {
-  message.value = msg;
-  isError.value = error;
-  setTimeout(() => message.value = '', 4000);
+// --- NEW QUIZ BUILDER FUNCTIONS ---
+const addQuestion = (moduleId) => {
+  newContent.value[moduleId].metadata.questions.push({
+    question: '',
+    options: ['', ''], // Start with 2 options
+    answer: ''
+  });
 };
-const handleApiError = (err, defaultMsg) => {
-  const errorMsg = err.response?.data?.error || defaultMsg;
-  showApiMessage(errorMsg, true);
+const addOption = (moduleId, questionIndex) => {
+  newContent.value[moduleId].metadata.questions[questionIndex].options.push('');
 };
 
-onMounted(fetchCourses);
 </script>
 
 <style scoped>

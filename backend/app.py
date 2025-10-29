@@ -8,7 +8,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_jwt_extended import create_access_token, JWTManager, jwt_required, get_jwt_identity
 from sqlalchemy.exc import IntegrityError
-from models import db, User, UserRole, Student, Teacher, Course, Module, LearningContent, StudentContentProgress
+from models import db, User, UserRole, Student, Teacher, Course, Module, LearningContent, StudentContentProgress, AssessmentAttempt
 
 # Application Setup
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
