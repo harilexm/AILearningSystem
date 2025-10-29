@@ -2,7 +2,6 @@ from flask_sqlalchemy import SQLAlchemy
 import uuid
 from sqlalchemy.dialects.postgresql import UUID, ENUM
 import datetime
-from sqlalchemy.dialects.postgresql import JSONB
 
 db = SQLAlchemy()
 
@@ -92,33 +91,11 @@ class LearningContent(db.Model):
     module_id = db.Column(UUID(as_uuid=True), db.ForeignKey('modules.id'), nullable=False)
     type = db.Column(ENUM('video', 'article', 'quiz', 'exercise', 'assignment', name='content_type'), nullable=False)
     title = db.Column(db.String(255), nullable=False)
-    content_body = db.Column(db.Text)
-    content_order = db.Column(db.Integer, nullable=False)
-    content_metadata = db.Column(JSONB)
     content_url = db.Column(db.Text) # For videos, external links
     content_body = db.Column(db.Text) # For articles, text
     content_order = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
-    
-class AssessmentAttempt(db.Model):
-    __tablename__ = 'assessment_attempts'
-    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    content_id = db.Column(UUID(as_uuid=True), db.ForeignKey('learning_content.id'), nullable=False)
-    student_id = db.Column(UUID(as_uuid=True), db.ForeignKey('students.id'), nullable=False)
-    score = db.Column(db.Numeric(7, 2), nullable=True)
-    max_score = db.Column(db.Numeric(7, 2), nullable=False)
-    submitted_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
-    
-    # Store the student's full set of answers for review.
-    answers = db.Column(JSONB)
 
-    # Relationships
-    student = db.relationship('Student', backref='quiz_attempts')
-    quiz = db.relationship('LearningContent', backref='attempts')
-
-    def __repr__(self):
-        return f'<Attempt student={self.student_id} quiz={self.content_id} score={self.score}>'
-    
 # backend/models.py
 # ... (all existing imports and models are unchanged) ...
 
