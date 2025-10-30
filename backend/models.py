@@ -100,21 +100,28 @@ class LearningContent(db.Model):
         return f'<LearningContent {self.title}>'
 
 # --- NEW MODEL (NOW WITH __repr__) ---
+# backend/models.py
+
+# --- Find and verify this specific class ---
+
 class AssessmentAttempt(db.Model):
     __tablename__ = 'assessment_attempts'
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     content_id = db.Column(UUID(as_uuid=True), db.ForeignKey('learning_content.id'), nullable=False)
     student_id = db.Column(UUID(as_uuid=True), db.ForeignKey('students.id'), nullable=False)
-    score = db.Column(NUMERIC(5, 2), nullable=False) # e.g., 95.50
-    answers = db.Column(JSONB, nullable=False) # Stores what the student submitted
+    score = db.Column(NUMERIC(5, 2), nullable=False)
+    
+    # --- THIS IS THE CRITICAL LINE ---
+    # Ensure this line exists and is correct.
+    max_score = db.Column(NUMERIC(5, 2), nullable=False)
+    
+    answers = db.Column(JSONB, nullable=False)
     submitted_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
 
     # Relationships
     student = db.relationship('Student', backref='quiz_attempts')
     quiz = db.relationship('LearningContent', backref='attempts')
 
-    # --- THIS IS THE FIX ---
-    # Add this method for better debugging representation.
     def __repr__(self):
         return f'<AssessmentAttempt student={self.student_id} quiz={self.content_id} score={self.score}>'
 # backend/models.py
