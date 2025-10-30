@@ -31,6 +31,10 @@
               <a v-if="content.type === 'video' && content.url" :href="content.url" target="_blank" class="content-link">
                 Watch Video &rarr;
               </a>
+              <!-- Button for articles -->
+              <a v-if="content.type === 'article'" @click.prevent="toggleArticle(content.id)" href="#" class="content-link">
+                {{ expandedArticles[content.id] ? 'Hide Article' : 'Read Article' }}
+              </a>
             </div>
             
             <!-- Action Buttons -->
@@ -48,6 +52,9 @@
                   </span>
                 </template>
               </template>
+            </div>
+            <div v-if="content.type === 'article' && expandedArticles[content.id]" class="article-body">
+              <div v-html="content.body"></div>
             </div>
           </li>
         </ul>
@@ -70,6 +77,12 @@ const authStore = useAuthStore();
 const course = ref(null);
 const isLoading = ref(true);
 const error = ref('');
+const expandedArticles = ref({});
+
+// --- ADD THIS NEW FUNCTION ---
+const toggleArticle = (contentId) => {
+  expandedArticles.value[contentId] = !expandedArticles.value[contentId];
+};
 
 const apiClient = axios.create({
   baseURL: 'http://localhost:5000/api',
@@ -123,6 +136,21 @@ onMounted(fetchCourseDetails);
 <style scoped>
 .course-detail-container { max-width: 900px; margin: 2rem auto; padding: 1rem; }
 .loading-state, .error-state { text-align: center; padding: 4rem; color: #6c757d; }
+/* ... add this to your existing styles ... */
+.article-body {
+  /* This ensures the article content spans the full width below the item */
+  flex-basis: 100%; 
+  margin-top: 1rem;
+  padding: 1.5rem;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  border: 1px solid #e9ecef;
+  line-height: 1.6;
+}
+.content-item {
+  /* Add this to allow the article body to wrap correctly */
+  flex-wrap: wrap;
+}
 .course-title { font-size: 2.5rem; margin-bottom: 0.5rem; color: #2c3e50; }
 .course-description { font-size: 1.1rem; color: #6c757d; margin-bottom: 3rem; }
 .module-container { background: #fff; border-radius: 8px; padding: 1.5rem 2rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
