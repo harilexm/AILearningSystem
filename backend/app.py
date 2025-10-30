@@ -150,40 +150,46 @@ def get_quiz_questions(content_id):
         "questions": sanitized_questions
     })
 
+# backend/app.py
+
+# --- REPLACE this entire function in your file ---
+
 @app.route('/api/quizzes/<uuid:content_id>/submit', methods=['POST'])
-@jwt_required()
+@roles_required('student')
 def submit_quiz(content_id):
     """
     Receives student answers, grades them, saves the attempt, and returns results.
     """
     content = LearningContent.query.get_or_404(content_id)
     if content.type != 'quiz' or not content.quiz_data:
-        return jsonify({"error": "This content is not a valid quiz."}), 404
+        return jsonify({"error": "This is not a valid quiz."}), 404
 
-    # Get the student profile associated with the logged-in user
-    current_user_id = get_jwt_identity()
-    student = Student.query.filter_by(user_id=current_user_id).first()
+    student = Student.query.filter_by(user_id=get_jwt_identity()).first()
     if not student:
-        return jsonify({"error": "A student profile is required to submit a quiz."}), 403
+        return jsonify({"error": "Student profile required to submit."}), 403
 
-    student_answers = request.get_json().get('answers', {}) # e.g., {"q1": 1, "q2": 2}
+    student_answers = request.get_json().get('answers', {})
     correct_answers = {q['id']: q['correct_answer_index'] for q in content.quiz_data['questions']}
     
-    # Grade the submission
     score = 0
     total_questions = len(correct_answers)
     for question_id, correct_index in correct_answers.items():
-        if question_id in student_answers and int(student_answers[question_id]) == correct_index:
+        # Check if student answered and if the answer was correct
+        if student_answers.get(question_id) is not None and int(student_answers.get(question_id)) == correct_index:
             score += 1
     
+    # Calculate score as a percentage
     percentage = round((score / total_questions) * 100, 2) if total_questions > 0 else 0
 
-    # Save the full attempt to the database for record-keeping
+    # Save the attempt to the database
     new_attempt = AssessmentAttempt(
         content_id=content_id,
         student_id=student.id,
         score=percentage,
-        answers=student_answers  # Store exactly what the student submitted
+        # --- THIS IS THE FIX ---
+        # The max_score is always 100 because we are storing the score as a percentage.
+        max_score=100.00, 
+        answers=student_answers
     )
     db.session.add(new_attempt)
     db.session.commit()
@@ -196,7 +202,6 @@ def submit_quiz(content_id):
         "correct_answers": correct_answers,
         "student_answers": student_answers
     })
-
 
 # ADMIN USER MANAGEMENT API
 @app.route('/api/admin/users', methods=['GET'])
@@ -383,27 +388,33 @@ def create_module(course_id):
     db.session.commit()
     return jsonify({"message": "Module added successfully", "module_id": str(new_module.id)}), 201
 
+# backend/app.py
+
+# --- REPLACE this entire function in your file ---
+
 @app.route('/api/modules/<uuid:module_id>/content', methods=['POST'])
 @roles_required('teacher', 'administrator')
 def create_learning_content(module_id):
     """Creates new learning content and adds it to a module."""
     module = Module.query.get_or_404(module_id)
     data = request.get_json()
-    required = ['title', 'type', 'order']
-    if not all(field in data for field in required):
-        return jsonify({"error": "Title, type, and order are required"}), 400
-
+    if not all(k in data for k in ['title', 'type', 'order']):
+        return jsonify({"error": "Title, type, and order required"}), 400
+    
+    # This is the corrected constructor call that includes quiz_data
     new_content = LearningContent(
-        module_id=module.id,
-        title=data['title'],
-        type=data['type'],
-        content_order=data['order'],
-        content_url=data.get('url'),
-        content_body=data.get('body')
+        module_id=module.id, 
+        title=data['title'], 
+        type=data['type'], 
+        content_order=data['order'], 
+        content_url=data.get('url'), 
+        content_body=data.get('body'), 
+        quiz_data=data.get('quiz_data') # <-- This line was missing from the version I gave you
     )
+    
     db.session.add(new_content)
     db.session.commit()
-    return jsonify({"message": "Learning content added successfully", "content_id": str(new_content.id)}), 201
+    return jsonify({"message": "Content added", "content_id": str(new_content.id)}), 201
 
 # backend/app.py
 # --- ADD THIS NEW ROUTE ---
