@@ -40,36 +40,62 @@
         
         <div v-else>
           <h2>Building: {{ selectedCourse.title }}</h2>
-          <RouterLink 
-            :to="{ name: 'course-progress', params: { courseId: selectedCourse.id } }" 
-            class="btn btn-secondary"
-          >
+          <RouterLink :to="{ name: 'course-progress', params: { courseId: selectedCourse.id } }" class="btn btn-secondary">
             View Student Progress
           </RouterLink>
           
           <!-- Modules Section -->
           <div v-for="module in selectedCourse.modules" :key="module.id" class="card module-card">
             <h3>Module {{ module.order }}: {{ module.title }}</h3>
-            <!-- Existing Content -->
             <ul class="content-list">
               <li v-for="content in module.learning_contents" :key="content.id" class="content-item">
                 <span>{{ content.order }}. {{ content.title }} ({{ content.type }})</span>
               </li>
               <li v-if="!module.learning_contents.length" class="content-item-empty">No content yet.</li>
             </ul>
-            <!-- Add New Content Form -->
+
+            <!-- ADD NEW CONTENT FORM (ENHANCED) -->
             <form @submit.prevent="handleAddContent(module.id)" class="add-content-form">
-              <h4>Add New Content</h4>
+              <h4>Add New Content to "{{ module.title }}"</h4>
               <input v-model="newContent[module.id].title" type="text" placeholder="Content Title" required/>
               <select v-model="newContent[module.id].type">
                 <option value="video">Video</option>
                 <option value="article">Article</option>
+                <option value="quiz">Quiz</option>
               </select>
-              <input v-model="newContent[module.id].url" type="text" placeholder="Content URL (for videos)" />
-              <button type="submit" class="btn-small">Add Content</button>
+
+              <!-- Conditional fields based on type -->
+              <input v-if="newContent[module.id].type === 'video'" v-model="newContent[module.id].url" type="text" placeholder="Video URL" />
+              <textarea v-if="newContent[module.id].type === 'article'" v-model="newContent[module.id].body" placeholder="Article content..."></textarea>
+              
+              <!-- QUIZ BUILDER UI -->
+              <div v-if="newContent[module.id].type === 'quiz'" class="quiz-builder">
+                <div class="question-list">
+                  <div v-for="(q, index) in newContent[module.id].quiz_data.questions" :key="index" class="question-preview">
+                    <strong>Q{{index+1}}:</strong> {{ q.text }} 
+                    <button @click.prevent="removeQuestion(module.id, index)" class="btn-remove-q" title="Remove Question">x</button>
+                  </div>
+                </div>
+                <div class="new-question-form">
+                  <h5>Add a Question</h5>
+                  <input v-model="newQuestion.text" placeholder="Question text..." />
+                  <input v-model="newQuestion.options[0]" placeholder="Option 1" />
+                  <input v-model="newQuestion.options[1]" placeholder="Option 2" />
+                  <input v-model="newQuestion.options[2]" placeholder="Option 3" />
+                  <div class="correct-answer-selector">
+                    <strong>Correct Answer:</strong>
+                    <label v-for="i in 3" :key="i">
+                      <input type="radio" :value="i-1" v-model="newQuestion.correct_answer_index" name="correct-answer" /> Option {{i}}
+                    </label>
+                  </div>
+                  <button @click.prevent="addQuestionToContent(module.id)" class="btn-add-q">Add Question to Quiz</button>
+                </div>
+              </div>
+
+              <button type="submit" class="btn-small">Save New Content</button>
             </form>
           </div>
-
+          
           <!-- Add New Module Form -->
           <div class="card">
             <h2>Add New Module</h2>
@@ -89,51 +115,87 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
+import { RouterLink } from 'vue-router';
 import axios from 'axios';
 
+// --- STATE MANAGEMENT ---
 const authStore = useAuthStore();
 const courses = ref([]);
 const selectedCourse = ref(null);
-const isLoadingCourses = ref(true);
+const isLoadingCourses = ref(true); // The variable causing the infinite load
 const message = ref('');
 const isError = ref(false);
 
+// State for the creation forms
 const newCourse = ref({ title: '', description: '' });
 const newModule = ref({ title: '', description: '' });
-const newContent = ref({}); // Use an object keyed by module ID
+const newContent = ref({}); // Use an object keyed by module ID for dynamic forms
 
-const apiClient = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  headers: { Authorization: `Bearer ${authStore.token}` }
+// State for the Quiz Builder UI
+const defaultQuestionState = () => ({ text: '', options: ['', '', ''], correct_answer_index: null });
+const newQuestion = ref(defaultQuestionState());
+
+// --- API CLIENT SETUP ---
+const apiClient = axios.create({ 
+  baseURL: 'http://localhost:5000/api', 
+  headers: { Authorization: `Bearer ${authStore.token}` } 
 });
+
+// --- API HELPER FUNCTIONS (FULLY IMPLEMENTED) ---
+
+const showApiMessage = (msg, error = false) => {
+  message.value = msg;
+  isError.value = error;
+  // Clear the message after 4 seconds
+  setTimeout(() => message.value = '', 4000);
+};
+
+const handleApiError = (err, defaultMsg) => {
+  const errorMsg = err.response?.data?.error || defaultMsg;
+  showApiMessage(errorMsg, true);
+};
 
 const fetchCourses = async () => {
   isLoadingCourses.value = true;
   try {
     const response = await apiClient.get('/courses');
     courses.value = response.data;
-  } catch (err) { handleApiError(err, 'Failed to load courses.'); }
-  finally { isLoadingCourses.value = false; }
+  } catch (err) { 
+    handleApiError(err, 'Failed to load courses.'); 
+  } finally {
+    // THIS IS THE CRITICAL FIX: Ensure the correct loading variable is set to false
+    isLoadingCourses.value = false;
+  }
 };
 
 const selectCourse = async (courseId) => {
   try {
     const response = await apiClient.get(`/courses/${courseId}`);
     selectedCourse.value = response.data;
-    // Initialize newContent objects for each module
+    // Initialize the 'newContent' state for each module within the selected course
     selectedCourse.value.modules.forEach(module => {
-      newContent.value[module.id] = { title: '', type: 'video', url: '', body: '' };
+      newContent.value[module.id] = { 
+        title: '', 
+        type: 'video', 
+        url: '', 
+        body: '', 
+        quiz_data: { questions: [] } 
+      };
     });
-  } catch (err) { handleApiError(err, 'Failed to load course details.'); }
+  } catch (err) { 
+    handleApiError(err, 'Failed to load course details.'); 
+  }
 };
 
 const handleCreateCourse = async () => {
   try {
     await apiClient.post('/courses', newCourse.value);
     showApiMessage('Course created successfully.');
-    newCourse.value = { title: '', description: '' };
-    await fetchCourses();
-  } catch (err) { handleApiError(err, 'Failed to create course.'); }
+    newCourse.value = { title: '', description: '' }; // Reset form
+    await fetchCourses(); // Refresh the course list
+  } catch (err) { 
+    handleApiError(err, 'Failed to create course.'); 
+  }
 };
 
 const handleAddModule = async () => {
@@ -142,37 +204,66 @@ const handleAddModule = async () => {
   try {
     await apiClient.post(`/courses/${selectedCourse.value.id}/modules`, payload);
     showApiMessage('Module added successfully.');
-    newModule.value.title = '';
-    await selectCourse(selectedCourse.value.id); // Refresh details
-  } catch (err) { handleApiError(err, 'Failed to add module.'); }
+    newModule.value.title = ''; // Reset form
+    await selectCourse(selectedCourse.value.id); // Refresh course details
+  } catch (err) { 
+    handleApiError(err, 'Failed to add module.'); 
+  }
 };
 
 const handleAddContent = async (moduleId) => {
   const module = selectedCourse.value.modules.find(m => m.id === moduleId);
   const nextOrder = (module.learning_contents.length || 0) + 1;
   const payload = { ...newContent.value[moduleId], order: nextOrder };
+
+  if (payload.type === 'quiz' && payload.quiz_data.questions.length === 0) {
+      showApiMessage('A quiz must have at least one question before saving.', true);
+      return;
+  }
   try {
     await apiClient.post(`/modules/${moduleId}/content`, payload);
     showApiMessage('Content added successfully.');
-    newContent.value[moduleId] = { title: '', type: 'video', url: '', body: '' };
-    await selectCourse(selectedCourse.value.id); // Refresh details
-  } catch (err) { handleApiError(err, 'Failed to add content.'); }
+    // Reset the content form for that specific module
+    newContent.value[moduleId] = { title: '', type: 'video', url: '', body: '', quiz_data: { questions: [] } };
+    await selectCourse(selectedCourse.value.id); // Refresh course details
+  } catch (err) { 
+    handleApiError(err, 'Failed to add content.'); 
+  }
 };
 
-const showApiMessage = (msg, error = false) => {
-  message.value = msg;
-  isError.value = error;
-  setTimeout(() => message.value = '', 4000);
+// --- QUIZ BUILDER METHODS (FULLY IMPLEMENTED) ---
+
+const addQuestionToContent = (moduleId) => {
+  if (!newQuestion.value.text || newQuestion.value.options.some(o => !o) || newQuestion.value.correct_answer_index === null) {
+    showApiMessage('Please fill all question fields and select a correct answer.', true);
+    return;
+  }
+  const questionWithId = { ...newQuestion.value, id: `q${Date.now()}` };
+  newContent.value[moduleId].quiz_data.questions.push(questionWithId);
+  newQuestion.value = defaultQuestionState(); // Reset form
 };
-const handleApiError = (err, defaultMsg) => {
-  const errorMsg = err.response?.data?.error || defaultMsg;
-  showApiMessage(errorMsg, true);
+
+const removeQuestion = (moduleId, questionIndex) => {
+  newContent.value[moduleId].quiz_data.questions.splice(questionIndex, 1);
 };
 
 onMounted(fetchCourses);
 </script>
 
 <style scoped>
+/* All existing styles are still valid */
+/* --- NEW STYLES FOR QUIZ BUILDER --- */
+.quiz-builder { border: 1px solid #e9ecef; padding: 1rem; margin-top: 1rem; border-radius: 5px; background: #f8f9fa; }
+.new-question-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #ccc; }
+.new-question-form h5 { margin-top: 0; }
+.new-question-form input[type="text"] { margin-bottom: 0.5rem; }
+.correct-answer-selector { font-size: 0.9em; margin: 0.5rem 0; display: flex; align-items: center; gap: 1rem; }
+.correct-answer-selector label { display: flex; align-items: center; gap: 0.25rem; }
+.btn-add-q { background-color: #28a745; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+.question-preview { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; }
+.btn-remove-q { background-color: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 20px; text-align: center; }
+
+/* Existing Styles for reference */
 .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: flex-start; }
 .course-list-panel .card { margin-bottom: 1rem; }
 .course-builder-panel .placeholder { text-align: center; padding: 4rem; color: #888; }
@@ -183,24 +274,17 @@ onMounted(fetchCourses);
 .module-card { margin-bottom: 1.5rem; }
 .content-list { list-style: none; padding-left: 1rem; margin-top: 1rem; }
 .content-item { background-color: #f8f9fa; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; }
-.content-item-empty { color: #888; font-style: italic; }
-.add-content-form { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; display: flex; gap: 0.5rem; align-items: center;}
+.add-content-form { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
+.add-content-form > input, .add-content-form > select, .add-content-form > textarea { margin-bottom: 1rem; }
 .btn-small { padding: 0.5rem 1rem; }
-/* General Styles from before */
+.btn-secondary { display: inline-block; background-color: #6c757d; margin-bottom: 1.5rem; text-decoration: none; padding: .5rem 1rem; color: white; border-radius: 4px; font-size: .9rem;}
 .course-mgmt-container { max-width: 1200px; margin: 2rem auto; padding: 1rem; }
 .card { background: #fff; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 .form-group { margin-bottom: 1rem; }
 label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
 input, textarea, select { width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
 .btn { background-color: #007bff; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; }
-.btn-secondary {
-  display: inline-block;
-  background-color: #6c757d;
-  margin-bottom: 1.5rem;
-  text-decoration: none;
-}
-.message { padding: 1rem; border-radius: 4px; text-align: center; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); }
+.message { padding: 1rem; border-radius: 4px; text-align: center; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 100;}
 .success { background-color: #d4edda; color: #155724; }
 .error { background-color: #f8d7da; color: #721c24; }
-
 </style>

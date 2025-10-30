@@ -8,7 +8,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from flask_jwt_extended import create_access_token, JWTManager, jwt_required, get_jwt_identity
 from sqlalchemy.exc import IntegrityError
-from models import db, User, UserRole, Student, Teacher, Course, Module, LearningContent, StudentContentProgress
+from models import db, User, UserRole, Student, Teacher, Course, Module, LearningContent, StudentContentProgress, AssessmentAttempt
 
 # Application Setup
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -124,6 +124,79 @@ def get_profile():
     user = User.query.get(current_user_id)
     if not user: return jsonify({"error": "User not found"}), 404
     return jsonify({"id": str(user.id), "username": user.username, "email": user.email, "roles": [r.role for r in user.roles]}), 200
+
+@app.route('/api/quizzes/<uuid:content_id>', methods=['GET'])
+@jwt_required()
+def get_quiz_questions(content_id):
+    """
+    Fetches a quiz for a student, returning only the questions, not the answers.
+    """
+    content = LearningContent.query.get_or_404(content_id)
+    if content.type != 'quiz' or not content.quiz_data:
+        return jsonify({"error": "This content is not a valid quiz."}), 404
+
+    # SECURITY: Sanitize the questions, removing the correct answer index to prevent cheating.
+    sanitized_questions = []
+    for q in content.quiz_data.get('questions', []):
+        sanitized_questions.append({
+            "id": q.get("id"),
+            "text": q.get("text"),
+            "options": q.get("options")
+        })
+
+    return jsonify({
+        "quiz_id": str(content.id),
+        "title": content.title,
+        "questions": sanitized_questions
+    })
+
+@app.route('/api/quizzes/<uuid:content_id>/submit', methods=['POST'])
+@jwt_required()
+def submit_quiz(content_id):
+    """
+    Receives student answers, grades them, saves the attempt, and returns results.
+    """
+    content = LearningContent.query.get_or_404(content_id)
+    if content.type != 'quiz' or not content.quiz_data:
+        return jsonify({"error": "This content is not a valid quiz."}), 404
+
+    # Get the student profile associated with the logged-in user
+    current_user_id = get_jwt_identity()
+    student = Student.query.filter_by(user_id=current_user_id).first()
+    if not student:
+        return jsonify({"error": "A student profile is required to submit a quiz."}), 403
+
+    student_answers = request.get_json().get('answers', {}) # e.g., {"q1": 1, "q2": 2}
+    correct_answers = {q['id']: q['correct_answer_index'] for q in content.quiz_data['questions']}
+    
+    # Grade the submission
+    score = 0
+    total_questions = len(correct_answers)
+    for question_id, correct_index in correct_answers.items():
+        if question_id in student_answers and int(student_answers[question_id]) == correct_index:
+            score += 1
+    
+    percentage = round((score / total_questions) * 100, 2) if total_questions > 0 else 0
+
+    # Save the full attempt to the database for record-keeping
+    new_attempt = AssessmentAttempt(
+        content_id=content_id,
+        student_id=student.id,
+        score=percentage,
+        answers=student_answers  # Store exactly what the student submitted
+    )
+    db.session.add(new_attempt)
+    db.session.commit()
+
+    # Return the results to the student for immediate feedback
+    return jsonify({
+        "message": "Quiz submitted successfully!",
+        "score": percentage,
+        "total_questions": total_questions,
+        "correct_answers": correct_answers,
+        "student_answers": student_answers
+    })
+
 
 # ADMIN USER MANAGEMENT API
 @app.route('/api/admin/users', methods=['GET'])
