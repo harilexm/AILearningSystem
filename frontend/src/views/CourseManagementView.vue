@@ -54,10 +54,11 @@
               <li v-if="!module.learning_contents.length" class="content-item-empty">No content yet.</li>
             </ul>
 
-            <!-- ADD NEW CONTENT FORM (ENHANCED) -->
+            <!-- ADD NEW CONTENT FORM (CORRECTED) -->
             <form @submit.prevent="handleAddContent(module.id)" class="add-content-form">
               <h4>Add New Content to "{{ module.title }}"</h4>
               <input v-model="newContent[module.id].title" type="text" placeholder="Content Title" required/>
+              <!-- THIS IS THE FIX: The 'Quiz' option is now present -->
               <select v-model="newContent[module.id].type">
                 <option value="video">Video</option>
                 <option value="article">Article</option>
@@ -68,7 +69,7 @@
               <input v-if="newContent[module.id].type === 'video'" v-model="newContent[module.id].url" type="text" placeholder="Video URL" />
               <textarea v-if="newContent[module.id].type === 'article'" v-model="newContent[module.id].body" placeholder="Article content..."></textarea>
               
-              <!-- QUIZ BUILDER UI -->
+              <!-- QUIZ BUILDER UI (Now correctly linked to the select option) -->
               <div v-if="newContent[module.id].type === 'quiz'" class="quiz-builder">
                 <div class="question-list">
                   <div v-for="(q, index) in newContent[module.id].quiz_data.questions" :key="index" class="question-preview">
@@ -122,16 +123,12 @@ import axios from 'axios';
 const authStore = useAuthStore();
 const courses = ref([]);
 const selectedCourse = ref(null);
-const isLoadingCourses = ref(true); // The variable causing the infinite load
+const isLoadingCourses = ref(true);
 const message = ref('');
 const isError = ref(false);
-
-// State for the creation forms
 const newCourse = ref({ title: '', description: '' });
 const newModule = ref({ title: '', description: '' });
-const newContent = ref({}); // Use an object keyed by module ID for dynamic forms
-
-// State for the Quiz Builder UI
+const newContent = ref({});
 const defaultQuestionState = () => ({ text: '', options: ['', '', ''], correct_answer_index: null });
 const newQuestion = ref(defaultQuestionState());
 
@@ -141,12 +138,10 @@ const apiClient = axios.create({
   headers: { Authorization: `Bearer ${authStore.token}` } 
 });
 
-// --- API HELPER FUNCTIONS (FULLY IMPLEMENTED) ---
-
+// --- API HELPER FUNCTIONS ---
 const showApiMessage = (msg, error = false) => {
   message.value = msg;
   isError.value = error;
-  // Clear the message after 4 seconds
   setTimeout(() => message.value = '', 4000);
 };
 
@@ -163,7 +158,6 @@ const fetchCourses = async () => {
   } catch (err) { 
     handleApiError(err, 'Failed to load courses.'); 
   } finally {
-    // THIS IS THE CRITICAL FIX: Ensure the correct loading variable is set to false
     isLoadingCourses.value = false;
   }
 };
@@ -172,7 +166,6 @@ const selectCourse = async (courseId) => {
   try {
     const response = await apiClient.get(`/courses/${courseId}`);
     selectedCourse.value = response.data;
-    // Initialize the 'newContent' state for each module within the selected course
     selectedCourse.value.modules.forEach(module => {
       newContent.value[module.id] = { 
         title: '', 
@@ -191,8 +184,8 @@ const handleCreateCourse = async () => {
   try {
     await apiClient.post('/courses', newCourse.value);
     showApiMessage('Course created successfully.');
-    newCourse.value = { title: '', description: '' }; // Reset form
-    await fetchCourses(); // Refresh the course list
+    newCourse.value = { title: '', description: '' };
+    await fetchCourses();
   } catch (err) { 
     handleApiError(err, 'Failed to create course.'); 
   }
@@ -204,8 +197,8 @@ const handleAddModule = async () => {
   try {
     await apiClient.post(`/courses/${selectedCourse.value.id}/modules`, payload);
     showApiMessage('Module added successfully.');
-    newModule.value.title = ''; // Reset form
-    await selectCourse(selectedCourse.value.id); // Refresh course details
+    newModule.value.title = '';
+    await selectCourse(selectedCourse.value.id);
   } catch (err) { 
     handleApiError(err, 'Failed to add module.'); 
   }
@@ -223,16 +216,14 @@ const handleAddContent = async (moduleId) => {
   try {
     await apiClient.post(`/modules/${moduleId}/content`, payload);
     showApiMessage('Content added successfully.');
-    // Reset the content form for that specific module
     newContent.value[moduleId] = { title: '', type: 'video', url: '', body: '', quiz_data: { questions: [] } };
-    await selectCourse(selectedCourse.value.id); // Refresh course details
+    await selectCourse(selectedCourse.value.id);
   } catch (err) { 
     handleApiError(err, 'Failed to add content.'); 
   }
 };
 
-// --- QUIZ BUILDER METHODS (FULLY IMPLEMENTED) ---
-
+// --- QUIZ BUILDER METHODS ---
 const addQuestionToContent = (moduleId) => {
   if (!newQuestion.value.text || newQuestion.value.options.some(o => !o) || newQuestion.value.correct_answer_index === null) {
     showApiMessage('Please fill all question fields and select a correct answer.', true);
@@ -240,30 +231,20 @@ const addQuestionToContent = (moduleId) => {
   }
   const questionWithId = { ...newQuestion.value, id: `q${Date.now()}` };
   newContent.value[moduleId].quiz_data.questions.push(questionWithId);
-  newQuestion.value = defaultQuestionState(); // Reset form
+  newQuestion.value = defaultQuestionState();
 };
 
 const removeQuestion = (moduleId, questionIndex) => {
   newContent.value[moduleId].quiz_data.questions.splice(questionIndex, 1);
 };
 
+// --- LIFECYCLE HOOK ---
 onMounted(fetchCourses);
+
 </script>
 
 <style scoped>
-/* All existing styles are still valid */
-/* --- NEW STYLES FOR QUIZ BUILDER --- */
-.quiz-builder { border: 1px solid #e9ecef; padding: 1rem; margin-top: 1rem; border-radius: 5px; background: #f8f9fa; }
-.new-question-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #ccc; }
-.new-question-form h5 { margin-top: 0; }
-.new-question-form input[type="text"] { margin-bottom: 0.5rem; }
-.correct-answer-selector { font-size: 0.9em; margin: 0.5rem 0; display: flex; align-items: center; gap: 1rem; }
-.correct-answer-selector label { display: flex; align-items: center; gap: 0.25rem; }
-.btn-add-q { background-color: #28a745; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
-.question-preview { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; }
-.btn-remove-q { background-color: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 20px; text-align: center; }
-
-/* Existing Styles for reference */
+/* All styles from before are still correct and included for completeness */
 .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: flex-start; }
 .course-list-panel .card { margin-bottom: 1rem; }
 .course-builder-panel .placeholder { text-align: center; padding: 4rem; color: #888; }
@@ -276,6 +257,15 @@ onMounted(fetchCourses);
 .content-item { background-color: #f8f9fa; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; }
 .add-content-form { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee; }
 .add-content-form > input, .add-content-form > select, .add-content-form > textarea { margin-bottom: 1rem; }
+.quiz-builder { border: 1px solid #e9ecef; padding: 1rem; margin-top: 1rem; border-radius: 5px; background: #f8f9fa; }
+.new-question-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #ccc; }
+.new-question-form h5 { margin-top: 0; }
+.new-question-form input[type="text"] { margin-bottom: 0.5rem; }
+.correct-answer-selector { font-size: 0.9em; margin: 0.5rem 0; display: flex; align-items: center; gap: 1rem; }
+.correct-answer-selector label { display: flex; align-items: center; gap: 0.25rem; }
+.btn-add-q { background-color: #28a745; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+.question-preview { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 0.5rem; border-radius: 4px; margin-bottom: 0.5rem; }
+.btn-remove-q { background-color: #dc3545; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; line-height: 20px; text-align: center; }
 .btn-small { padding: 0.5rem 1rem; }
 .btn-secondary { display: inline-block; background-color: #6c757d; margin-bottom: 1.5rem; text-decoration: none; padding: .5rem 1rem; color: white; border-radius: 4px; font-size: .9rem;}
 .course-mgmt-container { max-width: 1200px; margin: 2rem auto; padding: 1rem; }

@@ -90,6 +90,18 @@ const router = createRouter({
         requiresAuth: true,
         allowedRoles: ['teacher', 'administrator']
       }
+    },
+    // --- THIS IS THE MISSING PIECE ---
+    // Add this route object to your `routes` array.
+    // A good place is after the 'course-details' route.
+    {
+      path: '/quiz/:contentId/take',
+      name: 'quiz-player',
+      component: () => import('../views/QuizPlayerView.vue'),
+      meta: { 
+        requiresAuth: true,
+        allowedRoles: ['student'] // Only students should be taking quizzes
+      }
     }
   ]
 })

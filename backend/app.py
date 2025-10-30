@@ -296,30 +296,57 @@ def get_courses():
 # backend/app.py
 # --- REPLACE the old get_course_details function with this one ---
 
+# backend/app.py
+
+# --- REPLACE your existing get_course_details function with this one ---
+
+# backend/app.py
+
+# --- REPLACE your existing get_course_details function with this one ---
+
+# backend/app.py
+
+# --- REPLACE your existing get_course_details function with this one ---
+
 @app.route('/api/courses/<uuid:course_id>', methods=['GET'])
 @jwt_required()
 def get_course_details(course_id):
-    """Returns a single course with its structure AND the current student's progress."""
+    """
+    Returns a single course with its structure AND the current student's progress.
+    This is the DEFINITIVELY CORRECT version that includes all necessary fields.
+    """
     course = Course.query.get_or_404(course_id)
     current_user_id = get_jwt_identity()
     student = Student.query.filter_by(user_id=current_user_id).first()
     
-    # Efficiently fetch all progress for this student in this course
     student_progress = {}
     if student:
         content_ids = [content.id for module in course.modules for content in module.learning_contents]
-        progress_records = StudentContentProgress.query.filter(
-            StudentContentProgress.student_id == student.id,
-            StudentContentProgress.content_id.in_(content_ids)
-        ).all()
-        student_progress = {str(p.content_id): p.status for p in progress_records}
+        if content_ids:
+            progress_records = StudentContentProgress.query.filter(
+                StudentContentProgress.student_id == student.id,
+                StudentContentProgress.content_id.in_(content_ids)
+            ).all()
+            student_progress = {str(p.content_id): p.status for p in progress_records}
 
-    # Build the response payload
-    course_data = {"id": str(course.id), "title": course.title, "description": course.description, "modules": []}
+    course_data = {
+        "id": str(course.id), 
+        "title": course.title, 
+        "description": course.description, 
+        "modules": []
+    }
+    
     sorted_modules = sorted(course.modules, key=lambda m: m.module_order)
     
     for module in sorted_modules:
-        module_data = {"id": str(module.id), "title": module.title, "learning_contents": []}
+        module_data = {
+            "id": str(module.id),
+            "title": module.title,
+            "description": module.description,
+            "order": module.module_order,
+            "learning_contents": []
+        }
+        
         sorted_content = sorted(module.learning_contents, key=lambda c: c.content_order)
         for content in sorted_content:
             content_data = {
@@ -327,10 +354,12 @@ def get_course_details(course_id):
                 "title": content.title,
                 "type": content.type,
                 "url": content.content_url,
-                # Add the student's progress status to the response
+                "body": content.content_body,
+                "order": content.content_order,
                 "progress_status": student_progress.get(str(content.id), 'not_started')
             }
             module_data["learning_contents"].append(content_data)
+        
         course_data["modules"].append(module_data)
         
     return jsonify(course_data)

@@ -1,32 +1,59 @@
 <template>
   <div class="course-detail-container">
-    <div v-if="isLoading" class="loading">Loading course details...</div>
-    <div v-else-if="error" class="error-message">{{ error }}</div>
+    <!-- 1. Loading State -->
+    <div v-if="isLoading" class="loading-state">
+      <h2>Loading course details...</h2>
+    </div>
+
+    <!-- 2. Error State -->
+    <div v-else-if="error" class="error-state">
+      <h2>Something went wrong</h2>
+      <p>{{ error }}</p>
+      <RouterLink to="/dashboard">Back to Dashboard</RouterLink>
+    </div>
     
-    <div v-else-if="course">
+    <!-- 3. Success State -->
+    <div v-else-if="course" class="course-content">
       <h1 class="course-title">{{ course.title }}</h1>
       <p class="course-description">{{ course.description }}</p>
       
+      <!-- Loop through Modules -->
       <div v-for="module in course.modules" :key="module.id" class="module-container">
-        <h2>{{ module.title }}</h2>
-        <ul class="content-list">
+        <h2>Module {{ module.order }}: {{ module.title }}</h2>
+        <p v-if="module.description" class="module-description">{{ module.description }}</p>
+
+        <!-- Loop through Learning Content in each Module -->
+        <ul v-if="module.learning_contents && module.learning_contents.length" class="content-list">
           <li v-for="content in module.learning_contents" :key="content.id" class="content-item">
             <span class="content-type-icon">{{ getIconFor(content.type) }}</span>
             <div class="content-info">
-              <span class="content-title">{{ content.title }}</span>
-              <a v-if="content.url" :href="content.url" target="_blank" class="content-link">Go to Content &rarr;</a>
+              <span class="content-title">{{ content.order }}. {{ content.title }}</span>
+              <a v-if="content.type === 'video' && content.url" :href="content.url" target="_blank" class="content-link">
+                Watch Video &rarr;
+              </a>
             </div>
-            <!-- INTERACTION BUTTON -->
+            
+            <!-- Action Buttons -->
             <div class="content-action">
-              <button v-if="content.progress_status !== 'completed'" @click="markAsComplete(content.id)" class="btn-complete">
-                Mark as Complete
-              </button>
-              <span v-else class="status-completed">
-                Completed ✔️
-              </span>
+              <template v-if="authStore.isStudent">
+                <RouterLink v-if="content.type === 'quiz'" :to="{ name: 'quiz-player', params: { contentId: content.id } }" class="btn-quiz">
+                  Start Quiz
+                </RouterLink>
+                <template v-else>
+                  <button v-if="content.progress_status !== 'completed'" @click="markAsComplete(content.id)" class="btn-complete">
+                    Mark as Complete
+                  </button>
+                  <span v-else class="status-completed">
+                    Completed ✔️
+                  </span>
+                </template>
+              </template>
             </div>
           </li>
         </ul>
+        <div v-else class="no-content">
+            <p>No learning content has been added to this module yet.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -34,7 +61,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, RouterLink } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import axios from 'axios';
 
@@ -53,22 +80,27 @@ const fetchCourseDetails = async () => {
   const courseId = route.params.courseId;
   try {
     const response = await apiClient.get(`/courses/${courseId}`);
-    course.value = response.data;
-  } catch (err) { error.value = 'Failed to load course details.'; } 
-  finally { isLoading.value = false; }
+    if (response.data && response.data.modules) {
+        course.value = response.data;
+    } else {
+        throw new Error("Invalid course data received from server.");
+    }
+  } catch (err) {
+    console.error("API Error fetching course details:", err);
+    error.value = 'Failed to load course details. The course may not exist or an error occurred.';
+  } finally {
+    isLoading.value = false;
+  }
 };
 
-// --- NEW FUNCTION ---
 const markAsComplete = async (contentId) => {
   try {
     await apiClient.post(`/progress/${contentId}/complete`);
-    // Find the content item in our local state and update it
-    // This provides an instant UI update without a full page reload.
     for (const module of course.value.modules) {
       const contentItem = module.learning_contents.find(c => c.id === contentId);
       if (contentItem) {
         contentItem.progress_status = 'completed';
-        break; // Stop searching once found
+        break;
       }
     }
   } catch (err) {
@@ -77,50 +109,36 @@ const markAsComplete = async (contentId) => {
 };
 
 const getIconFor = (type) => {
-  if (type === 'video') return '▶️';
-  if (type === 'article') return '📄';
-  return '🔗';
+  switch (type) {
+    case 'video': return '▶️';
+    case 'article': return '📄';
+    case 'quiz': return '❓';
+    default: return '🔗';
+  }
 };
 
 onMounted(fetchCourseDetails);
 </script>
 
 <style scoped>
-/* ... (keep all existing styles) ... */
-.content-item {
-  display: flex;
-  align-items: center;
-  padding: 1rem 0;
-  border-bottom: 1px solid #f1f1f1;
-}
-.content-info { flex-grow: 1; }
-/* --- NEW STYLES --- */
-.content-action { margin-left: auto; }
-.btn-complete {
-  background-color: #007bff;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 5px;
-  cursor: pointer;
-  font-weight: 500;
-}
-.btn-complete:hover { background-color: #0056b3; }
-.status-completed {
-  color: #28a745;
-  font-weight: bold;
-  padding: 0.5rem 1rem;
-}
-/* All other styles from the previous step are correct */
 .course-detail-container { max-width: 900px; margin: 2rem auto; padding: 1rem; }
-.course-title { font-size: 2.5rem; margin-bottom: 0.5rem; }
+.loading-state, .error-state { text-align: center; padding: 4rem; color: #6c757d; }
+.course-title { font-size: 2.5rem; margin-bottom: 0.5rem; color: #2c3e50; }
 .course-description { font-size: 1.1rem; color: #6c757d; margin-bottom: 3rem; }
 .module-container { background: #fff; border-radius: 8px; padding: 1.5rem 2rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .module-container h2 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 1rem; }
-.content-list { list-style: none; padding: 0; }
+.module-description { font-style: italic; color: #6c757d; }
+.content-list { list-style: none; padding: 0; margin-top: 1rem; }
+.no-content { color: #888; font-style: italic; padding: 1rem 0;}
+.content-item { display: flex; align-items: center; padding: 1rem 0; border-bottom: 1px solid #f1f1f1; }
 .content-item:last-child { border-bottom: none; }
 .content-type-icon { font-size: 1.5rem; margin-right: 1.5rem; }
+.content-info { flex-grow: 1; }
 .content-title { font-weight: 500; display: block; }
 .content-link { font-size: 0.9rem; color: #007bff; text-decoration: none; font-weight: bold; }
-.error-message, .loading { text-align: center; font-size: 1.2rem; padding: 2rem; }
+.content-action { margin-left: auto; white-space: nowrap; }
+.btn-complete { background-color: #007bff; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; font-weight: 500; }
+.btn-complete:hover { background-color: #0056b3; }
+.status-completed { color: #28a745; font-weight: bold; padding: 0.5rem 1rem; }
+.btn-quiz { background-color: #17a2b8; color: white; border: none; padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; font-weight: 500; text-decoration: none; }
 </style>
