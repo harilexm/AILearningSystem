@@ -25,7 +25,11 @@
           <div v-if="isLoadingCourses">Loading...</div>
           <ul v-else-if="courses.length > 0" class="course-list">
             <li v-for="course in courses" :key="course.id" @click="selectCourse(course.id)" :class="{ selected: selectedCourse?.id === course.id }">
-              {{ course.title }}
+                    <!-- 1. Title is now wrapped in a span -->
+            <span>{{ course.title }}</span>
+            
+            <!-- 2. The new delete button is added -->
+            <button @click.stop="handleDeleteCourse(course.id)" class="btn-delete" title="Delete Course">x</button>
             </li>
           </ul>
           <p v-else>No courses created yet.</p>
@@ -47,9 +51,11 @@
           <!-- Modules Section -->
           <div v-for="module in selectedCourse.modules" :key="module.id" class="card module-card">
             <h3>Module {{ module.order }}: {{ module.title }}</h3>
+            <button @click="handleDeleteModule(module.id)" class="btn-delete" title="Delete Module">x</button>
             <ul class="content-list">
               <li v-for="content in module.learning_contents" :key="content.id" class="content-item">
                 <span>{{ content.order }}. {{ content.title }} ({{ content.type }})</span>
+                <button @click="handleDeleteContent(content.id)" class="btn-delete" title="Delete Content Item">x</button>
               </li>
               <li v-if="!module.learning_contents.length" class="content-item-empty">No content yet.</li>
             </ul>
@@ -244,6 +250,46 @@ const removeQuestion = (moduleId, questionIndex) => {
   newContent.value[moduleId].quiz_data.questions.splice(questionIndex, 1);
 };
 
+// --- NEW DELETE METHODS ---
+const handleDeleteCourse = async (courseId) => {
+  if (confirm('Are you sure you want to delete this entire course? This action cannot be undone.')) {
+    try {
+      await apiClient.delete(`/courses/${courseId}`);
+      showApiMessage('Course deleted successfully.');
+      selectedCourse.value = null; // Deselect if the current course was deleted
+      await fetchCourses(); // Refresh the list
+    } catch (err) {
+      handleApiError(err, 'Failed to delete course.');
+    }
+  }
+};
+
+const handleDeleteModule = async (moduleId) => {
+  if (confirm('Are you sure you want to delete this module and all its content?')) {
+    try {
+      await apiClient.delete(`/modules/${moduleId}`);
+      showApiMessage('Module deleted successfully.');
+      // Refresh the details of the currently selected course
+      await selectCourse(selectedCourse.value.id);
+    } catch (err) {
+      handleApiError(err, 'Failed to delete module.');
+    }
+  }
+};
+
+const handleDeleteContent = async (contentId) => {
+  if (confirm('Are you sure you want to delete this content item?')) {
+    try {
+      await apiClient.delete(`/content/${contentId}`);
+      showApiMessage('Content item deleted successfully.');
+      // Refresh the details of the currently selected course
+      await selectCourse(selectedCourse.value.id);
+    } catch (err) {
+      handleApiError(err, 'Failed to delete content item.');
+    }
+  }
+};
+
 // --- LIFECYCLE HOOK ---
 onMounted(fetchCourses);
 
@@ -253,6 +299,35 @@ onMounted(fetchCourses);
 /* All styles from before are still correct and included for completeness */
 .tag-group {
   margin-top: 1rem;
+}
+.course-list li, .module-header, .content-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.btn-delete {
+  background-color: transparent;
+  color: #dc3545;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  font-weight: bold;
+  line-height: 24px;
+  text-align: center;
+  visibility: hidden; /* Hide by default */
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.course-list li:hover .btn-delete,
+.module-card:hover .module-header .btn-delete,
+.content-item:hover .btn-delete {
+  visibility: visible; /* Show on hover */
+  opacity: 1;
+}
+.btn-delete:hover {
+  background-color: #f8d7da;
 }
 .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: flex-start; }
 .course-list-panel .card { margin-bottom: 1rem; }
