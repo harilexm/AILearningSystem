@@ -610,5 +610,75 @@ def get_recommendations():
             
     return jsonify(recommendations)
 
+# backend/app.py
+# ... (all existing code) ...
+
+# --- NEW: TEACHER PERFORMANCE ANALYTICS API ---
+
+@app.route('/api/courses/<uuid:course_id>/performance', methods=['GET'])
+@roles_required('teacher', 'administrator')
+def get_course_performance(course_id):
+    """
+    For a given course, aggregates all student quiz scores and attempts.
+    Accessible by teachers and admins.
+    """
+    course = Course.query.get_or_404(course_id)
+    
+    # 1. Find all content items in this course that are quizzes
+    course_quiz_ids = [
+        content.id for module in course.modules 
+        for content in module.learning_contents if content.type == 'quiz'
+    ]
+
+    if not course_quiz_ids:
+        return jsonify([]) # No quizzes in this course, return empty list
+
+    # 2. Find all assessment attempts for these quizzes
+    all_attempts = AssessmentAttempt.query.filter(
+        AssessmentAttempt.content_id.in_(course_quiz_ids)
+    ).all()
+
+    # 3. Aggregate the data by student for a clean, structured response
+    performance_data = {}
+    for attempt in all_attempts:
+        student_id = attempt.student_id
+        
+        # If this is the first time we've seen this student, initialize their record
+        if student_id not in performance_data:
+            performance_data[student_id] = {
+                "student_id": str(student_id),
+                "student_name": f"{attempt.student.first_name} {attempt.student.last_name}",
+                "attempts": [],
+                "total_score": 0,
+                "attempt_count": 0
+            }
+        
+        # Add the current attempt's details
+        performance_data[student_id]['attempts'].append({
+            "quiz_id": str(attempt.content_id),
+            "quiz_title": attempt.quiz.title,
+            "attempt_number": attempt.attempt_number,
+            "score": float(attempt.score) # Ensure score is a float
+        })
+        performance_data[student_id]['total_score'] += attempt.score
+        performance_data[student_id]['attempt_count'] += 1
+        
+    # 4. Calculate average scores and format the final list
+    output = []
+    for student_id, data in performance_data.items():
+        data['average_score'] = round(data['total_score'] / data['attempt_count'], 2)
+        # Sort attempts by quiz title and then attempt number
+        data['attempts'].sort(key=lambda x: (x['quiz_title'], x['attempt_number']))
+        del data['total_score'] # Clean up temporary fields
+        del data['attempt_count']
+        output.append(data)
+
+    # Sort the final output by student name
+    output.sort(key=lambda x: x['student_name'])
+    
+    return jsonify(output)
+
+# ... (rest of your app.py file)
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
