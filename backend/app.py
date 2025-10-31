@@ -310,6 +310,41 @@ def get_courses():
         output.append({"id": str(c.id), "title": c.title, "description": c.description, "author": teacher_name})
     return jsonify(output)
 
+@app.route('/api/courses/<uuid:course_id>', methods=['DELETE'])
+@roles_required('teacher', 'administrator')
+def delete_course(course_id):
+    """Deletes a course and all its nested modules and content."""
+    course = Course.query.get_or_404(course_id)
+    
+    # The 'cascade="all, delete-orphan"' in the models handles the deletion
+    # of all child modules and content automatically.
+    db.session.delete(course)
+    db.session.commit()
+    
+    return jsonify({"message": f"Course '{course.title}' has been deleted."})
+
+@app.route('/api/modules/<uuid:module_id>', methods=['DELETE'])
+@roles_required('teacher', 'administrator')
+def delete_module(module_id):
+    """Deletes a module and all its nested content."""
+    module = Module.query.get_or_404(module_id)
+    
+    db.session.delete(module)
+    db.session.commit()
+    
+    return jsonify({"message": f"Module '{module.title}' has been deleted."})
+
+@app.route('/api/content/<uuid:content_id>', methods=['DELETE'])
+@roles_required('teacher', 'administrator')
+def delete_learning_content(content_id):
+    """Deletes a single piece of learning content."""
+    content = LearningContent.query.get_or_404(content_id)
+    
+    db.session.delete(content)
+    db.session.commit()
+    
+    return jsonify({"message": f"Content '{content.title}' has been deleted."})
+
 # backend/app.py
 # --- REPLACE the old get_course_details function with this one ---
 
