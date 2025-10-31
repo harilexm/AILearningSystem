@@ -1,6 +1,7 @@
 import os
 import uuid
 import datetime
+from collections import Counter
 from functools import wraps
 from flask import Flask, request, jsonify
 from flask_bcrypt import Bcrypt
@@ -505,6 +506,63 @@ def get_course_progress(course_id):
     output.sort(key=lambda x: x['student_name'])
     
     return jsonify(output)
+
+@app.route('/api/students/me/recommendations', methods=['GET'])
+@roles_required('student')
+def get_recommendations():
+    """Generates personalized content recommendations for the logged-in student."""
+    # 1. Get the student's profile
+    student = Student.query.filter_by(user_id=get_jwt_identity()).first()
+    if not student:
+        return jsonify([]) # Return empty list if no student profile
+
+    # 2. Get the IDs of all content the student has already completed
+    completed_progress = StudentContentProgress.query.filter_by(student_id=student.id, status='completed').all()
+    completed_content_ids = {p.content_id for p in completed_progress}
+
+    if not completed_content_ids:
+        return jsonify([]) # No history, no recommendations
+
+    # 3. Find all tags from the content they have completed
+    completed_contents = LearningContent.query.filter(LearningContent.id.in_(completed_content_ids)).all()
+    all_tags = []
+    for content in completed_contents:
+        if content.tags:
+            # Split tags by comma, strip whitespace, and convert to lowercase
+            all_tags.extend([tag.strip().lower() for tag in content.tags.split(',')])
+
+    if not all_tags:
+        return jsonify([]) # No tagged content completed
+
+    # 4. Find the student's top 3 most frequent tags (their "strong topics")
+    tag_counts = Counter(all_tags)
+    top_tags = {tag for tag, count in tag_counts.most_common(3)}
+
+    # 5. Find uncompleted content that matches these top tags
+    # This is a simple but effective way to find relevant content
+    recommendation_candidates = LearningContent.query.filter(
+        LearningContent.id.notin_(completed_content_ids),
+        LearningContent.tags != None
+    ).limit(50).all() # Limit initial candidates for performance
+
+    recommendations = []
+    for content in recommendation_candidates:
+        content_tags = {tag.strip().lower() for tag in content.tags.split(',')}
+        # If the content's tags overlap with the student's top tags, it's a good recommendation
+        if content_tags.intersection(top_tags):
+            recommendations.append({
+                "id": str(content.id),
+                "title": content.title,
+                "type": content.type,
+                # Add context for the UI
+                "module_title": content.module.title,
+                "course_title": content.module.course.title,
+                "course_id": str(content.module.course.id)
+            })
+        if len(recommendations) >= 5: # Limit to a max of 5 recommendations
+            break
+            
+    return jsonify(recommendations)
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

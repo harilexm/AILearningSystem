@@ -64,6 +64,11 @@
                 <option value="article">Article</option>
                 <option value="quiz">Quiz</option>
               </select>
+              <!-- ADD THIS NEW FORM GROUP -->
+              <div class="form-group tag-group">
+                <label>Tags (comma-separated)</label>
+                <input v-model="newContent[module.id].tags" type="text" placeholder="e.g., algebra, intro, calculus" />
+              </div>
 
               <!-- Conditional fields based on type -->
               <input v-if="newContent[module.id].type === 'video'" v-model="newContent[module.id].url" type="text" placeholder="Video URL" />
@@ -246,6 +251,9 @@ onMounted(fetchCourses);
 
 <style scoped>
 /* All styles from before are still correct and included for completeness */
+.tag-group {
+  margin-top: 1rem;
+}
 .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; align-items: flex-start; }
 .course-list-panel .card { margin-bottom: 1rem; }
 .course-builder-panel .placeholder { text-align: center; padding: 4rem; color: #888; }
