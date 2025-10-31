@@ -111,7 +111,7 @@ class AssessmentAttempt(db.Model):
     content_id = db.Column(UUID(as_uuid=True), db.ForeignKey('learning_content.id'), nullable=False)
     student_id = db.Column(UUID(as_uuid=True), db.ForeignKey('students.id'), nullable=False)
     score = db.Column(NUMERIC(5, 2), nullable=False)
-    
+    attempt_number = db.Column(db.Integer, nullable=False, default=1)
     # --- THIS IS THE CRITICAL LINE ---
     # Ensure this line exists and is correct.
     max_score = db.Column(NUMERIC(5, 2), nullable=False)

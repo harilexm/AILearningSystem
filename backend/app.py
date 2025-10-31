@@ -155,11 +155,16 @@ def get_quiz_questions(content_id):
 
 # --- REPLACE this entire function in your file ---
 
+# backend/app.py
+
+# --- REPLACE this entire function in your file ---
+
 @app.route('/api/quizzes/<uuid:content_id>/submit', methods=['POST'])
 @roles_required('student')
 def submit_quiz(content_id):
     """
-    Receives student answers, grades them, saves the attempt, and returns results.
+    Receives student answers, grades them, saves the attempt with a correct attempt number, 
+    and returns results.
     """
     content = LearningContent.query.get_or_404(content_id)
     if content.type != 'quiz' or not content.quiz_data:
@@ -175,27 +180,33 @@ def submit_quiz(content_id):
     score = 0
     total_questions = len(correct_answers)
     for question_id, correct_index in correct_answers.items():
-        # Check if student answered and if the answer was correct
         if student_answers.get(question_id) is not None and int(student_answers.get(question_id)) == correct_index:
             score += 1
     
-    # Calculate score as a percentage
     percentage = round((score / total_questions) * 100, 2) if total_questions > 0 else 0
 
-    # Save the attempt to the database
+    # --- THIS IS THE FIX ---
+    # 1. Count previous attempts for this specific quiz by this student.
+    previous_attempts = AssessmentAttempt.query.filter_by(
+        student_id=student.id,
+        content_id=content_id
+    ).count()
+
+    # 2. The new attempt number is the count of previous attempts + 1.
+    new_attempt_number = previous_attempts + 1
+
+    # 3. Save the new attempt with the correct attempt number.
     new_attempt = AssessmentAttempt(
         content_id=content_id,
         student_id=student.id,
+        attempt_number=new_attempt_number, # <-- Use the calculated number
         score=percentage,
-        # --- THIS IS THE FIX ---
-        # The max_score is always 100 because we are storing the score as a percentage.
-        max_score=100.00, 
+        max_score=100.00,
         answers=student_answers
     )
     db.session.add(new_attempt)
     db.session.commit()
 
-    # Return the results to the student for immediate feedback
     return jsonify({
         "message": "Quiz submitted successfully!",
         "score": percentage,
