@@ -96,6 +96,7 @@ class LearningContent(db.Model):
     content_order = db.Column(db.Integer, nullable=False)
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.datetime.utcnow)
     quiz_data = db.Column(JSONB, nullable=True)
+    tags = db.Column(db.String(255), nullable=True) # e.g., "algebra,calculus,intro"
     def __repr__(self):
         return f'<LearningContent {self.title}>'
 
