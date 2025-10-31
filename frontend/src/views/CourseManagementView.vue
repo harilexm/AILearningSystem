@@ -172,7 +172,8 @@ const selectCourse = async (courseId) => {
         type: 'video', 
         url: '', 
         body: '', 
-        quiz_data: { questions: [] }
+        quiz_data: { questions: [] },
+        tags: '' 
       };
     });
   } catch (err) { 
