@@ -304,6 +304,26 @@ def create_course():
     db.session.commit()
     return jsonify({"message": "Course created successfully", "course_id": str(new_course.id)}), 201
 
+# --- NEW: UPDATE COURSE ENDPOINT ---
+
+@app.route('/api/courses/<uuid:course_id>', methods=['PUT'])
+@roles_required('teacher', 'administrator')
+def update_course(course_id):
+    """Updates a course's title and description."""
+    course = Course.query.get_or_404(course_id)
+    data = request.get_json()
+
+    if not data or not data.get('title'):
+        return jsonify({"error": "Title is required."}), 400
+
+    # Update the course object with the new data
+    course.title = data['title']
+    course.description = data.get('description', course.description)
+    
+    db.session.commit()
+    
+    return jsonify({"message": f"Course '{course.title}' has been updated."})
+
 @app.route('/api/courses', methods=['GET'])
 @jwt_required()
 def get_courses():
