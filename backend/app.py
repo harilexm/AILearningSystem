@@ -744,5 +744,64 @@ def generate_quiz_from_article():
         print(f"An error occurred with the OpenAI API: {e}")
         return jsonify({"error": f"An error occurred while generating the quiz: {e}"}), 500
 
+# --- NEW AI CHATBOT API ---
+
+@app.route('/api/ai/chatbot', methods=['POST'])
+@roles_required('student')
+def handle_chatbot_query():
+    """
+    Handles a student's question by sending it to OpenAI's GPT with context from an article.
+    """
+    if not openai.api_key:
+        return jsonify({"error": "AI service is not configured on the server."}), 503
+
+    data = request.get_json()
+    question = data.get('question')
+    article_text = data.get('context') # The text of the article the student is reading
+
+    if not question:
+        return jsonify({"error": "A question is required."}), 400
+    if not article_text:
+        return jsonify({"error": "Context (the article text) is required."}), 400
+
+    # This is the "prompt engineering" part. We give the AI a persona and strict instructions.
+    # This is a simple form of Retrieval-Augmented Generation (RAG).
+    system_prompt = (
+        "You are a friendly and encouraging tutor named StudyBot. Your role is to help a student "
+        "understand an article they are currently reading. Your answers must be based ONLY on the "
+        "information provided in the article text. If the answer cannot be found in the article, "
+        "you must politely state that you can only answer questions about the provided text. "
+        "Do not make up information or answer general knowledge questions."
+    )
+    
+    user_prompt = (
+        f"Here is the article text the student is reading:\n--- ARTICLE START ---\n"
+        f"{article_text}\n--- ARTICLE END ---\n\n"
+        f"Here is the student's question: \"{question}\""
+    )
+
+    prompt_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+
+    try:
+        # Make the API call to OpenAI
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=prompt_messages,
+            temperature=0.3, # Low temperature for more factual, less creative answers
+            max_tokens=200  # Limit the length of the response
+        )
+        
+        # Extract the text response from the AI
+        ai_response = completion.choices[0].message.content
+
+        return jsonify({"answer": ai_response})
+
+    except Exception as e:
+        print(f"An error occurred with the OpenAI API (Chatbot): {e}")
+        return jsonify({"error": f"An error occurred while communicating with the AI tutor."}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
