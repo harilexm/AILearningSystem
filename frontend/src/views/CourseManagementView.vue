@@ -170,6 +170,8 @@ const newContent = ref({});
 const defaultQuestionState = () => ({ text: '', options: ['', '', ''], correct_answer_index: null });
 const newQuestion = ref(defaultQuestionState());
 const isGeneratingQuiz = ref(false);
+const isEditingCourse = ref(false);
+const editingCourseData = ref({ id: null, title: '', description: '' });
 
 // --- API CLIENT SETUP ---
 const apiClient = axios.create({ 
@@ -182,6 +184,28 @@ const showApiMessage = (msg, error = false) => {
   message.value = msg;
   isError.value = error;
   setTimeout(() => message.value = '', 4000);
+};
+
+// --- NEW UPDATE METHODS ---
+const openEditModal = (course) => {
+  // Create a copy of the course data to avoid modifying the original list directly
+  editingCourseData.value = { ...course };
+  isEditingCourse.value = true;
+};
+
+const handleUpdateCourse = async () => {
+  if (!editingCourseData.value.id) return;
+  try {
+    await apiClient.put(`/courses/${editingCourseData.value.id}`, {
+      title: editingCourseData.value.title,
+      description: editingCourseData.value.description
+    });
+    showApiMessage('Course updated successfully.');
+    isEditingCourse.value = false; // Close the modal
+    await fetchCourses(); // Refresh the course list
+  } catch (err) {
+    handleApiError(err, 'Failed to update course.');
+  }
 };
 
 const handleApiError = (err, defaultMsg) => {
@@ -374,7 +398,64 @@ onMounted(fetchCourses);
   background-color: #b39ddb;
   cursor: not-allowed;
 }
-
+/* --- NEW/MODIFIED STYLES --- */
+.course-list li {
+  /* ... existing styles ... */
+  padding: 0.8rem 0.5rem; /* Adjust padding */
+}
+.course-title {
+  flex-grow: 1;
+  cursor: pointer;
+  padding: 0 0.5rem;
+}
+.course-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.course-list li:hover .course-actions {
+  visibility: visible;
+  opacity: 1;
+}
+.btn-edit {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.btn-delete {
+  /* Make it always visible within the actions div now */
+  visibility: visible;
+  opacity: 1;
+}
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+}
+.modal-content {
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 500px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
 .course-list li, .module-header, .content-item {
   display: flex;
   justify-content: space-between;
