@@ -79,7 +79,13 @@
               <!-- Conditional fields based on type -->
               <input v-if="newContent[module.id].type === 'video'" v-model="newContent[module.id].url" type="text" placeholder="Video URL" />
               <textarea v-if="newContent[module.id].type === 'article'" v-model="newContent[module.id].body" placeholder="Article content..."></textarea>
-              
+              <button 
+                  v-if="newContent[module.id].body && newContent[module.id].body.length >= 100" 
+                  @click.prevent="handleGenerateQuiz(module.id)" 
+                  class="btn-generate-quiz"
+                  :disabled="isGeneratingQuiz">
+                  {{ isGeneratingQuiz ? 'Generating...' : '🤖 Generate Quiz from this Article' }}
+                </button>
               <!-- QUIZ BUILDER UI (Now correctly linked to the select option) -->
               <div v-if="newContent[module.id].type === 'quiz'" class="quiz-builder">
                 <div class="question-list">
@@ -142,6 +148,7 @@ const newModule = ref({ title: '', description: '' });
 const newContent = ref({});
 const defaultQuestionState = () => ({ text: '', options: ['', '', ''], correct_answer_index: null });
 const newQuestion = ref(defaultQuestionState());
+const isGeneratingQuiz = ref(false);
 
 // --- API CLIENT SETUP ---
 const apiClient = axios.create({ 
@@ -172,6 +179,36 @@ const fetchCourses = async () => {
     isLoadingCourses.value = false;
   }
 };
+
+// --- NEW AI QUIZ GENERATION METHOD ---
+const handleGenerateQuiz = async (moduleId) => {
+  const articleText = newContent.value[moduleId].body;
+  if (!articleText || articleText.length < 100) {
+    showApiMessage('Article text must be at least 100 characters long to generate a quiz.', true);
+    return;
+  }
+
+  isGeneratingQuiz.value = true;
+  try {
+    const response = await apiClient.post('/ai/generate-quiz', { text: articleText });
+    const aiQuizData = response.data;
+
+    // Validate the AI response
+    if (aiQuizData && aiQuizData.questions) {
+      // Update the state to transform the UI from an article editor to a quiz builder
+      newContent.value[moduleId].type = 'quiz';
+      newContent.value[moduleId].quiz_data = aiQuizData;
+      showApiMessage('Quiz generated successfully! Please review before saving.');
+    } else {
+      throw new Error("AI response was not in the expected format.");
+    }
+  } catch (err) {
+    handleApiError(err, 'Failed to generate quiz from AI.');
+  } finally {
+    isGeneratingQuiz.value = false;
+  }
+};
+
 
 const selectCourse = async (courseId) => {
   try {
@@ -300,6 +337,23 @@ onMounted(fetchCourses);
 .tag-group {
   margin-top: 1rem;
 }
+.btn-generate-quiz {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: #6f42c1; /* A nice purple for AI features */
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+.btn-generate-quiz:disabled {
+  background-color: #b39ddb;
+  cursor: not-allowed;
+}
+
 .course-list li, .module-header, .content-item {
   display: flex;
   justify-content: space-between;
