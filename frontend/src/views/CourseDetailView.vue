@@ -55,6 +55,7 @@
             </div>
             <div v-if="content.type === 'article' && expandedArticles[content.id]" class="article-body">
               <div v-html="content.body"></div>
+              <ChatbotWidget :article-context="content.body" />
             </div>
           </li>
         </ul>
