@@ -72,7 +72,7 @@ import { ref, onMounted } from 'vue';
 import { useRoute, RouterLink } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import axios from 'axios';
-import ChatbotWidget from '@/views/ChatbotWidget.vue';
+import ChatbotWidget from '@/components/ChatbotWidget.vue';
 
 const route = useRoute();
 const authStore = useAuthStore();
