@@ -29,6 +29,7 @@
             <span>{{ course.title }}</span>
             
             <!-- 2. The new delete button is added -->
+            <button @click="openEditModal(course)" class="btn-edit" title="Edit Course">✏️</button>
             <button @click.stop="handleDeleteCourse(course.id)" class="btn-delete" title="Delete Course">x</button>
             </li>
           </ul>
@@ -127,6 +128,26 @@
     </div>
     
     <p v-if="message" class="message" :class="isError ? 'error' : 'success'">{{ message }}</p>
+    <!-- NEW: Edit Course Modal -->
+    <div v-if="isEditingCourse" class="modal-overlay" @click.self="isEditingCourse = false">
+      <div class="modal-content">
+        <h2>Edit Course</h2>
+        <form @submit.prevent="handleUpdateCourse">
+          <div class="form-group">
+            <label for="editCourseTitle">Course Title</label>
+            <input id="editCourseTitle" v-model="editingCourseData.title" type="text" required />
+          </div>
+          <div class="form-group">
+            <label for="editCourseDesc">Course Description</label>
+            <textarea id="editCourseDesc" v-model="editingCourseData.description"></textarea>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn-secondary" @click="isEditingCourse = false">Cancel</button>
+            <button type="submit" class="btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
