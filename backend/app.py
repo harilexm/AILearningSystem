@@ -1,6 +1,9 @@
 import os
 import uuid
 import datetime
+import json
+import openai
+from functools import wraps 
 from collections import Counter
 from functools import wraps
 from flask import Flask, request, jsonify
@@ -33,6 +36,11 @@ if not jwt_secret:
     raise RuntimeError("FATAL ERROR: JWT_SECRET_KEY is not set.")
 app.config["JWT_SECRET_KEY"] = jwt_secret
 jwt = JWTManager(app)
+
+# OpenAI Configuration
+openai.api_key = os.environ.get('OPENAI_API_KEY')
+if not openai.api_key:
+    print("Warning: OPENAI_API_KEY is not set. AI features will be disabled.")
 
 # Initialize Extensions
 db.init_app(app)
@@ -679,6 +687,62 @@ def get_course_performance(course_id):
     return jsonify(output)
 
 # ... (rest of your app.py file)
+# --- NEW AI QUIZ GENERATION API ---
+
+@app.route('/api/ai/generate-quiz', methods=['POST'])
+@roles_required('teacher', 'administrator')
+def generate_quiz_from_article():
+    """
+    Uses OpenAI's GPT to generate a quiz from a piece of text (article body).
+    Accessible by teachers and admins.
+    """
+    if not openai.api_key:
+        return jsonify({"error": "AI service is not configured on the server."}), 503 # 503 Service Unavailable
+
+    data = request.get_json()
+    article_text = data.get('text')
+
+    if not article_text or len(article_text) < 100:
+        return jsonify({"error": "Article text must be at least 100 characters long to generate a quiz."}), 400
+
+    # This is the "prompt" we send to the AI. It's carefully engineered to ask for a specific JSON format.
+    prompt_messages = [
+        {
+            "role": "system",
+            "content": "You are an expert educator and quiz creator. Your task is to generate a structured JSON object for a quiz based on the provided text. The quiz should contain exactly 3 multiple-choice questions. Each question must have a unique 'id', the question 'text', an array of three string 'options', and the 'correct_answer_index' (0, 1, or 2)."
+        },
+        {
+            "role": "user",
+            "content": f"Here is the article text: ```{article_text}```"
+        }
+    ]
+
+    try:
+        # Make the API call to OpenAI
+        completion = openai.chat.completions.create(
+            model="gpt-3.5-turbo-1106",  # A model that is good with JSON format
+            messages=prompt_messages,
+            response_format={ "type": "json_object" }, # Enforce JSON output
+            temperature=0.5 # A bit of creativity, but not too much
+        )
+        
+        # Extract the JSON string from the response
+        response_content = completion.choices[0].message.content
+        # Parse the JSON string into a Python dictionary
+        quiz_data = json.loads(response_content)
+
+        # Basic validation of the AI's output
+        if 'questions' not in quiz_data or not isinstance(quiz_data['questions'], list):
+            raise ValueError("AI response did not contain a valid 'questions' list.")
+
+        # Return the structured quiz_data, ready for our frontend
+        return jsonify(quiz_data)
+
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI generated an invalid JSON format. Please try again."}), 500
+    except Exception as e:
+        print(f"An error occurred with the OpenAI API: {e}")
+        return jsonify({"error": f"An error occurred while generating the quiz: {e}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
